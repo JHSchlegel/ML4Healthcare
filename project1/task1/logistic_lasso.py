@@ -1,4 +1,4 @@
-# This file contains the code for subtask 2 of task 1 of project 1 in
+# This file contains the code for question 2 of task 1 of project 1 in
 # Machine Learning for Healthcare offered at ETH Zurich in FS2024
 
 ## Packages and presets:
