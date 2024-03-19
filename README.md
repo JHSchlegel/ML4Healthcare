@@ -3,7 +3,7 @@ Private repository for the coding projects of ML for Healthcare at ETHZ
 
 ## Table of Contents
 - [Contributors](#contributors)
-- [Project Structure](project-structure)
+- [Project Structure](projectstructure)
 
 ## Contributors
 - Gianni
