@@ -26,11 +26,9 @@ pipreqs . --force
 
 ## Table of Contents
 
--[Contributors](#contributors)
-
--[Setup](#setup)
-
--[Project Structure](#project-structure)
+- [Contributors](#contributors)
+- [Setup](#setup)
+- [Project Structure](#project-structure)
 
 ## Contributors
 
