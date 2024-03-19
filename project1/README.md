@@ -1,6 +1,7 @@
 # Machine Learning for Healthcare: Project 1
 <span style="color: red;">Do the following to create a requirements.txt file (see [HERE](https://betterdatascience.com/python-pipreqs/) for more detailed tutorial):</span>
 ```bash
+conda create -n ml4hc python=3.10
 conda activate ml4hc
 pip install pipreqs
 pip install PACKAGENAMES
