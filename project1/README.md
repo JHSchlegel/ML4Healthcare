@@ -20,8 +20,25 @@ pipreqs . --force
 |Q4: NAM|||
 
 ### Task2
+|Q1: EDA|||
+|Q2: CNN|||
+|Q3: Integrated Gradients|||
+|Q4: Grad-CAM|||
+|Q5: Data Randomisation Test|||
 
 ### Task3
+#### Task3 - Part1
+|Q1: Consistency between methods and patterns|||
+|Q2: Convincing the doctor|||
+|Q3: Intuition features|||
+|Q4: Which models would you choose|||
+
+#### Task3 - Part2
+|Q1: Consistency between methods and patterns|||
+|Q2: Convincing the doctor|||
+|Q3: Intuition features|||
+|Q4: Which models would you choose|||
+
 
 ### Report
 
@@ -33,7 +50,7 @@ pipreqs . --force
 
 ## Contributors
 
-- Paul Schlossmacher (Legi here)
+- Paul Schlossmacher (23-941-636)
 - Gianfranco Basile (Legi here)
 - Jan Schlegel (19-747-096)
 
