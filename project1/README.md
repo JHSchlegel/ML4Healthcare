@@ -14,18 +14,18 @@ pipreqs . --force
 ### Task1
 |What|When|Who|
 |-----|----|----|
-|Q1: EDA|||
+|Q1: EDA||Jan|
 |Q2: Logistic Lasso|||
-|Q3: MLP|||
-|Q4: NAM|||
+|Q3: MLP||Paul|
+|Q4: NAM||Jan|
 
 ### Task2
 |What|When|Who|
 |-----|----|----|
-|Q1: EDA|||
-|Q2: CNN|||
-|Q3: Integrated Gradients|||
-|Q4: Grad-CAM|||
+|Q1: EDA||Jan|
+|Q2: CNN||Gianfranco|
+|Q3: Integrated Gradients||Gianfranco|
+|Q4: Grad-CAM||Paul|
 |Q5: Data Randomisation Test|||
 
 ### Task3
