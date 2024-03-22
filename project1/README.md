@@ -20,6 +20,8 @@ pipreqs . --force
 |Q4: NAM|||
 
 ### Task2
+|What|When|Who|
+|-----|----|----|
 |Q1: EDA|||
 |Q2: CNN|||
 |Q3: Integrated Gradients|||
@@ -28,12 +30,16 @@ pipreqs . --force
 
 ### Task3
 #### Task3 - Part1
+|What|When|Who|
+|-----|----|----|
 |Q1: Consistency between methods and patterns|||
 |Q2: Convincing the doctor|||
 |Q3: Intuition features|||
 |Q4: Which models would you choose|||
 
 #### Task3 - Part2
+|What|When|Who|
+|-----|----|----|
 |Q1: Consistency between methods and patterns|||
 |Q2: Convincing the doctor|||
 |Q3: Intuition features|||
