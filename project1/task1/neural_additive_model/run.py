@@ -84,9 +84,9 @@ def main():
 
     model = NAM(
         n_features=X_train.shape[1],
-        in_size=20,
+        in_size=1,
         out_size=1,
-        hidden_profile=[64, 32, 32],
+        hidden_profile=[64, 128, 256, 64],
         use_exu=True,
         use_relu_n=True,
         within_feature_dropout=0.2,
@@ -95,9 +95,10 @@ def main():
     # use BCEWithLogitsLoss for numerical stability
     criterion = nn.BCEWithLogitsLoss()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=9.6e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=9.6e-5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 20, 0.95)
 
-    # isualize the progress in the tensorboard by typing
+    # visualize the progress in the tensorboard by typing
     # `tensorboard --logdir logs` in the terminal and then navigate
     # to the created process in the browser
     writer = SummaryWriter("logs/nam_experiment")
@@ -116,6 +117,7 @@ def main():
         n_epochs=N_EPOCHS,
         ES=ES,
         summary_writer=writer,
+        scheduler=scheduler,
         device=DEVICE,
     )
 
