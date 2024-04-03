@@ -2,7 +2,13 @@ import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
 from typing import List
-from utils import ExULayer, ReLUn
+
+
+# append path to parent folder to allow imports from utils folder
+import sys
+
+sys.path.append("..")
+from utils.utils import ExULayer, ReLUn
 
 
 class FeatureNet(nn.Module):
@@ -50,7 +56,7 @@ class NAM(nn.Module):
         self,
         n_features: int,
         in_size: int,
-        out_size: int = 2,
+        out_size: int = 1,
         hidden_profile: List[int] = [1024],
         use_exu: bool = True,
         use_relu_n: bool = True,
