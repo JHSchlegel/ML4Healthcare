@@ -96,7 +96,6 @@ def main():
     criterion = nn.BCEWithLogitsLoss()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=9.6e-5)
-    scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 0.1)
 
     # isualize the progress in the tensorboard by typing
     # `tensorboard --logdir logs` in the terminal and then navigate
