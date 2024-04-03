@@ -3,16 +3,29 @@ from skimpy import clean_columns
 from pickle import load
 import torch
 import torch.nn as nn
-from utils import set_all_seeds, HeartFailureDataset, train_and_validate, test
-from torchsummary import summary
+from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from neural_additive_model import NAM
 from icecream import ic
 
+
+# append path to parent folder to allow imports from utils folder
+import sys
+
+sys.path.append("..")
+from utils.utils import (
+    set_all_seeds,
+    HeartFailureDataset,
+    train_and_validate,
+    test,
+    EarlyStopping,
+)
+
+
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-N_EPOCHS = 10
+N_EPOCHS = 1_000
 
 
 def main():
@@ -63,17 +76,17 @@ def main():
         train_dataset, batch_size=32, shuffle=True, pin_memory=True
     )
 
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, pin_memory=True)
 
     test_loader = DataLoader(
-        test_dataset, batch_size=32, shuffle=False, pin_memory=True
+        test_dataset, batch_size=128, shuffle=False, pin_memory=True
     )
 
     model = NAM(
         n_features=X_train.shape[1],
-        in_size=32,
-        out_size=2,
-        hidden_profile=[1024],
+        in_size=20,
+        out_size=1,
+        hidden_profile=[64, 32, 32],
         use_exu=True,
         use_relu_n=True,
         within_feature_dropout=0.2,
@@ -82,29 +95,34 @@ def main():
     # use BCEWithLogitsLoss for numerical stability
     criterion = nn.BCEWithLogitsLoss()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.0001, weight_decay=9.6e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=9.6e-5)
     scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 0.1)
+
+    # isualize the progress in the tensorboard by typing
+    # `tensorboard --logdir runs` in the terminal and then navigate
+    # to the created process in the browser
+    writer = SummaryWriter("runs/nam_experiment")
+
+    ES = EarlyStopping("../models/neural_additive_model.pth")
+
     # Set seed for reproducibility
     set_all_seeds(SEED)
 
-    train_and_validate(
+    _, _, _, _, best_threshold = train_and_validate(
         model,
         train_loader,
         val_loader,
         optimizer,
         criterion,
-        scheduler,
         n_epochs=N_EPOCHS,
-        name="nam",
+        ES=ES,
+        summary_writer=writer,
         device=DEVICE,
     )
 
-    test(
-        model,
-        test_loader,
-        criterion,
-        device=DEVICE,
-    )
+    set_all_seeds(SEED)
+
+    test(model, test_loader, criterion, device=DEVICE, threshold=best_threshold)
 
 
 if __name__ == "__main__":
