@@ -86,16 +86,16 @@ def main():
         n_features=X_train.shape[1],
         in_size=1,
         out_size=1,
-        hidden_profile=[64, 128, 256, 64],
-        use_exu=True,
-        use_relu_n=True,
-        within_feature_dropout=0.2,
+        hidden_profile=[128, 256, 512, 512, 256, 128],
+        use_exu=False,
+        use_relu_n=False,
+        within_feature_dropout=0.3,
         feature_dropout=0.0,
     ).to(DEVICE)
     # use BCEWithLogitsLoss for numerical stability
     criterion = nn.BCEWithLogitsLoss()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=9.6e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=9.6e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 20, 0.95)
 
     # visualize the progress in the tensorboard by typing
