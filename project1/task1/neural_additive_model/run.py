@@ -99,9 +99,9 @@ def main():
     scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, 0.1)
 
     # isualize the progress in the tensorboard by typing
-    # `tensorboard --logdir runs` in the terminal and then navigate
+    # `tensorboard --logdir logs` in the terminal and then navigate
     # to the created process in the browser
-    writer = SummaryWriter("runs/nam_experiment")
+    writer = SummaryWriter("logs/nam_experiment")
 
     ES = EarlyStopping("../models/neural_additive_model.pth")
 
