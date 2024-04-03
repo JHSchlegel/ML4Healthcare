@@ -77,7 +77,8 @@ class EarlyStopping:
     def __init__(
         self,
         best_model_path: str,
-        patience: int = 10,
+        start: int = 50,
+        patience: int = 20,
         epsilon: float = 1e-6,
         device: torch.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -89,13 +90,16 @@ class EarlyStopping:
 
         Args:
             best_model_path (str): Where to save the best model
+            start (int): After how many epochs should early stopping be checked.
+                Defaults to 10.
             patience (int, optional): Number of epochs without improvement until
-            training process is stopped early. Defaults to 10.
+            training process is stopped early. Defaults to 20.
             epsilon (float, optional): Tolerance of improvement to avoid stopping
                 solely because of numerical issues. Defaults to 1e-6.
             device (torch.device, optional): Device to run the model on. Defaults to torch.device( "cuda" if torch.cuda.is_available() else "cpu" ).
         """
         self.best_model_path = best_model_path
+        self.start = start
         self.counter = 0
         self.patience = patience
         self.epsilon = epsilon
@@ -103,7 +107,7 @@ class EarlyStopping:
         self.best_val_loss = np.inf
         self.device = device
 
-    def early_stop(self, val_loss: float, model: nn.Module) -> bool:
+    def early_stop(self, val_loss: float, model: nn.Module, current_epoch: int) -> bool:
         """Whether training should be stopped or not. If there was no improvement
         in a long time, training should be stopped. Continuously saves the best
         model.
@@ -111,6 +115,7 @@ class EarlyStopping:
         Args:
             val_loss (float): Current validation loss
             model (nn.Module): Current model
+            current_epoch (int): Current epoch number
 
         Returns:
             bool: Whether training should be stopped or not
@@ -124,9 +129,8 @@ class EarlyStopping:
             self.best_val_loss = val_loss
             # save current best model
             torch.save(self.best_model.state_dict(), self.best_model_path)
-        else:
-            self.counter += 1
-            # stop training if no improvement in a long time
+        elif current_epoch > self.start:
+            self.counter += 1  # stop training if no improvement in a long time
             if self.counter >= self.patience:
                 return True
         return False
@@ -275,8 +279,7 @@ def train_and_validate(
             bal_accs.append(bal_acc)
 
             # check whether training should be stopped early:
-            if ES.early_stop(val_loss, model):
-                print("should stop")
+            if ES.early_stop(val_loss, model, i):
                 break
     # get optimal threshold for class assignment for the best model;
     best_threshold = ES._get_best_threshold(val_loader)
