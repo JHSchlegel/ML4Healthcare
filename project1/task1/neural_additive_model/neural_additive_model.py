@@ -7,7 +7,7 @@ from typing import List, Tuple
 # append path to parent folder to allow imports from utils folder
 import sys
 
-sys.path.append("..")
+sys.path.append("../..")
 from utils.utils import ExULayer, ReLUn
 
 

@@ -13,7 +13,7 @@ from icecream import ic
 # append path to parent folder to allow imports from utils folder
 import sys
 
-sys.path.append("..")
+sys.path.append("../..")
 from utils.utils import (
     set_all_seeds,
     HeartFailureDataset,
