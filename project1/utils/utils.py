@@ -1,6 +1,9 @@
 # This file includes the utility functions for the neural additive model and
 # the MLP:
 
+# in the following, whenever we refer to the "NAM paper", we mean the following paper:
+# https://arxiv.org/pdf/2004.13912.pdf
+
 # -------------------------------
 # Packages and Presets
 # -------------------------------
@@ -48,23 +51,25 @@ class HeartFailureDataset(Dataset):
 # Find Best Threshold
 # -------------------------
 #!!! inspired by the following data science stack exchange post:
-# https://datascience.stackexchange.com/questions/96690/how-to-choose-the-right-threshold-for-binary-classification
+#!!! https://datascience.stackexchange.com/questions/96690/how-to-choose-the-right-threshold-for-binary-classification
 def get_best_threshold(probs: np.ndarray, y_true: np.ndarray) -> float:
-    """Get the optimal threshold for class assignments. Can then be used to assign
-    an observation to class 0 if probs <= optimal threshold and to class 1 if
-    probs > optimal threshold.
+    """Get the optimal threshold for class assignments w.r.t f1_score.
+        Can then be used to assign an observation to class 0 if
+        probs <= optimal threshold and to class 1 if probs > optimal threshold.
 
     Args:
         probs (np.ndarray): Predicted probabilities for each class
         y_true (np.ndarray): True labels
 
     Returns:
-        float: Optimal threshold
+        float: Optimal threshold w.r.t. f1_score
     """
     precision, recall, thresh = precision_recall_curve(y_true, probs)
 
     # calculate f1 score for every threshold
-    f1 = (2 * precision * recall) / (precision + recall)
+    # have to remove last element of precision and recall as it is only there
+    # to ensure full coverage but there is no corresponding threshold for these values
+    f1 = (2 * precision[:-1] * recall[:-1]) / (precision[:-1] + recall[:-1])
     return thresh[np.argmax(f1)]
 
 
@@ -72,7 +77,7 @@ def get_best_threshold(probs: np.ndarray, y_true: np.ndarray) -> float:
 # Early Stopping
 # -------------------------
 #!!! This Early Stopping class is inspired by the following stackoverflow post:
-# https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
+#!!! https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
 class EarlyStopping:
     def __init__(
         self,
@@ -138,20 +143,22 @@ class EarlyStopping:
         return False
 
     def _get_best_threshold(
-        self, val_loader: DataLoader, forward_returns_tuple: bool = False
+        self,
+        val_loader: DataLoader,
+        use_penalized_BCE: bool = False,
     ) -> float:
-        """Get the optimal threshold for class assignments. Can then be used to assign
-        an observation to class 0 if probs <= optimal threshold and to class 1 if
-        probs > optimal threshold.
+        """Get the optimal threshold for class assignments w.r.t. f1_score. Can then be used to assign
+            an observation to class 0 if probs <= optimal threshold and to class 1 if
+            probs > optimal threshold.
 
         Args:
             val_loader (DataLoader): Validation DataLoader containing validation
             data
-            forward_returns_tuple (bool): Whether the forward function of the model
+            use_penalized_BCE (bool): Whether the forward function of the model
                 returns a tuple (as the NAM class does) or not. Defaults to False.
 
         Returns:
-            float: Optimal threshold
+            float: Optimal threshold w.r.t. f1_score
         """
         y_true = []
         model_probabilities = []
@@ -162,7 +169,7 @@ class EarlyStopping:
                 # add true labels and predicted model probabilities to list
                 y_true.extend(y.numpy())
 
-                if forward_returns_tuple:
+                if use_penalized_BCE:
                     logits = self.best_model(x.to(self.device))[0]
 
                 else:
@@ -174,6 +181,121 @@ class EarlyStopping:
 # -------------------------
 # Train Loop
 # -------------------------
+def train_and_validate_one_epoch(
+    model: nn.Module,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    criterion: nn.Module,
+    ES: EarlyStopping,
+    use_penalized_BCE: bool = False,
+    output_regularization: float = 0.0,
+    l2_regularization: float = 0.0,
+    scheduler: torch.optim.lr_scheduler = None,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+) -> Tuple[float, float, float, float]:
+    """Train loop for the model. Returns the train loss, validation loss, validation f1 scores and
+    validation balanced accuracie scores over time and the optimal threshold
+    for class assignments (calculated on the validation set).
+
+    Args:
+        model (nn.Module): Neural network model
+        train_loader (DataLoader): DataLoader with training data
+        val_loader (DataLoader): DataLo0ader with validation data
+        optimizer (torch.optim.Optimizer): Optimizer to minimize loss with
+        criterion (nn.Module): Loss function to use
+        ES (EarlyStopping): EarlyStopping instance to use for early stopping
+            and calculation of optimal threshold
+        use_penalized_BCE (bool): Whether the penalized Binary Cross Entropy for
+            NAMs should be used. Defaults to False.
+        output_regularization (float, optional): Regularization coefficient for
+            penalized Binary Cross Entropy. Defaults to 0.0.
+        l2_regularization (float, optional): Regularization coefficient for
+            penalized Binary Cross Entropy. Defaults to 0.0.
+        summary_writer (SummaryWriter, optional): SummaryWriter to log results
+            of the training. Can then be used to visualize the progress in the tensorboard
+            by typing `tensorboard --logdir EXPERIMENT_DIRNAME` in the terminal and
+            then navigating to the created process in the browser. Defaults to None.
+        scheduler (torch.optim.lr_scheduler, optional): Learning rate swcheduler. Defaults to None.
+        device (torch.device, optional): Device to train on. Defaults to torch.device("cuda" if torch.cuda.is_available() else "cpu").
+
+    Returns:
+        Tuple[float, float, float, float]:
+            Returns the train loss, validation loss, validation f1 score and
+            validation balanced accuracy.
+    """
+    # set model to train mode for dropout
+    model.train()
+    train_loss = 0.0
+    for x, y in train_loader:
+        optimizer.zero_grad()
+
+        if use_penalized_BCE:
+            aggregated_logits, feature_logits = model(x.to(device))
+            loss = penalized_binary_cross_entropy(
+                model,
+                aggregated_logits,
+                feature_logits,
+                y.to(device),
+                output_regularization=output_regularization,
+                l2_regularization=l2_regularization,
+            )
+
+        else:
+            logits = model(x.to(device))
+            loss = criterion(logits, y.to(device))
+        loss.backward()
+        optimizer.step()
+
+        if scheduler is not None:
+            scheduler.step()
+
+        train_loss += loss.item()
+    # avg training loss for epoch
+    train_loss /= len(train_loader)
+
+    val_loss = 0.0
+    y_true = []
+    y_pred = []
+    with torch.no_grad():
+        # set model to eval mode to disable dropout during validation
+        model.eval()
+        for x, y in val_loader:
+            # add true and predicted labels for balanced accuracy and f1 score
+            y_true.extend(y.numpy())
+            # for predicted labels: use default threshold of 0.5
+            # threshold is tuned for the best model later on
+            if use_penalized_BCE:
+                aggregated_logits, feature_logits = model(x.to(device))
+                # calculate validation loss
+                loss = penalized_binary_cross_entropy(
+                    model,
+                    aggregated_logits,
+                    feature_logits,
+                    y.to(device),
+                    output_regularization=output_regularization,
+                    l2_regularization=l2_regularization,
+                )
+                y_pred.extend(
+                    F.sigmoid(aggregated_logits.detach()).cpu().numpy().round()
+                )
+
+            else:
+                logits = model(x.to(device))
+                y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round())
+
+                # calculate validation loss
+                loss = criterion(logits, y.to(device))
+            val_loss += loss.item()
+        # avg valdation loss for epoch
+        val_loss /= len(val_loader)
+
+    # calculate validation f1 score and balanced accuracy
+    f1 = f1_score(y_true, y_pred)
+    bal_acc = balanced_accuracy_score(y_true, y_pred)
+    return train_loss, val_loss, f1, bal_acc
+
+
 def train_and_validate(
     model: nn.Module,
     train_loader: DataLoader,
@@ -182,7 +304,9 @@ def train_and_validate(
     criterion: nn.Module,
     n_epochs: int,
     ES: EarlyStopping,
-    forward_returns_tuple: bool = False,
+    use_penalized_BCE: bool = False,
+    output_regularization: float = 0.0,
+    l2_regularization: float = 0.0,
     summary_writer: SummaryWriter = None,
     scheduler: torch.optim.lr_scheduler = None,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -200,8 +324,12 @@ def train_and_validate(
         n_epochs (int): Number of epochs to train for
         ES (EarlyStopping): EarlyStopping instance to use for early stopping
             and calculation of optimal threshold
-        forward_returns_tuple (bool): Whether the forward function of the model
-            returns a tuple (as the NAM class does) or not. Defaults to False.
+        use_penalized_BCE (bool): Whether the penalized Binary Cross Entropy for
+            NAMs should be used. Defaults to False.
+        output_regularization (float, optional): Regularization coefficient for
+            penalized Binary Cross Entropy. Defaults to 0.0.
+        l2_regularization (float, optional): Regularization coefficient for
+            penalized Binary Cross Entropy. Defaults to 0.0.
         summary_writer (SummaryWriter, optional): SummaryWriter to log results
             of the training. Can then be used to visualize the progress in the tensorboard
             by typing `tensorboard --logdir EXPERIMENT_DIRNAME` in the terminal and
@@ -226,62 +354,27 @@ def train_and_validate(
     with trange(n_epochs) as t:
         for i in t:
             dct = {}
-            # set model to train mode for dropout
-            model.train()
-            train_loss = 0.0
-            for x, y in train_loader:
-                optimizer.zero_grad()
-
-                if forward_returns_tuple:
-                    logits = model(x.to(device))[0]
-
-                else:
-                    logits = model(x.to(device))
-
-                loss = criterion(logits, y.to(device))
-                loss.backward()
-                optimizer.step()
-
-                if scheduler is not None:
-                    scheduler.step()
-
-                train_loss += loss.item()
-            # avg training loss
-            train_loss /= len(train_loader)
-
-            val_loss = 0.0
-            y_true = []
-            y_pred = []
-            with torch.no_grad():
-                # set model to eval mode to disable dropout during validation
-                model.eval()
-                for x, y in val_loader:
-                    # add true and predicted labels for balanced accuracy and f1 score
-                    y_true.extend(y.numpy())
-                    # for predicted labels: use default threshold of 0.5
-                    # threshold is tuned for the best model later on
-                    if forward_returns_tuple:
-                        logits = model(x.to(device))[0]
-                    else:
-                        logits = model(x.to(device))
-                    y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round())
-
-                    # calculate validation loss
-                    loss = criterion(logits, y.to(device))
-                    val_loss += loss.item()
-                # avg valdation loss
-                val_loss /= len(val_loader)
-
-            # calculate validation f1 score and balanced accuracy
-            f1 = f1_score(y_true, y_pred)
-            bal_acc = balanced_accuracy_score(y_true, y_pred)
-
+            # train and validate for one epoch
+            train_loss, val_loss, f1, bal_acc = train_and_validate_one_epoch(
+                model,
+                train_loader,
+                val_loader,
+                optimizer,
+                criterion,
+                ES,
+                use_penalized_BCE,
+                output_regularization,
+                l2_regularization,
+                scheduler,
+                device,
+            )
             # save current metrics in a dictionary to add them to the progressbar
             dct["train_loss"] = train_loss
             dct["val_loss"] = val_loss
             dct["f1"] = f1
             dct["bal_acc"] = bal_acc
 
+            # update progressbar
             t.set_postfix(dct)
 
             # log metrics to tensorboard:
@@ -301,7 +394,7 @@ def train_and_validate(
             if ES.early_stop(val_loss, model, i):
                 break
     # get optimal threshold for class assignment for the best model;
-    best_threshold = ES._get_best_threshold(val_loader)
+    best_threshold = ES._get_best_threshold(val_loader, use_penalized_BCE)
     return train_losses, val_losses, f1_scores, bal_accs, best_threshold
 
 
@@ -312,7 +405,9 @@ def test(
     model: nn.Module,
     test_loader: DataLoader,
     criterion: nn.Module,
-    forward_returns_tuple: bool = False,
+    use_penalized_BCE: bool = False,
+    output_regularization: float = 0.0,
+    l2_regularization: float = 0.0,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     threshold: float = 0.5,
 ) -> Tuple[float, float, float]:
@@ -322,8 +417,12 @@ def test(
         model (nn.Module): A neural network model.
         test_loader (DataLoader): DataLoader object with test data.
         criterion (nn.Module):  Loss function.
-        forward_returns_tuple (bool): Whether the forward function of the model
-            returns a tuple (as the NAM class does) or not. Defaults to False.
+        use_penalized_BCE (bool): Whether the penalized Binary Cross Entropy for
+            NAMs should be used. Defaults to False.
+        output_regularization (float, optional): Regularization coefficient for
+            penalized Binary Cross Entropy. Defaults to 0.0.
+        l2_regularization (float, optional): Regularization coefficient for
+            penalized Binary Cross Entropy. Defaults to 0.0.
         device (torch.device): Device to run the model on.
         threshold (float, optional): Optimal threshold for class assignment calculated
             on the validation set. Defaults to 0.5.
@@ -341,16 +440,33 @@ def test(
         for x, y in test_loader:
             y_true.extend(y.numpy())
             # calculate model probabilities
-            if forward_returns_tuple:
-                logits = model(x.to(device))[0]
+            if use_penalized_BCE:
+                aggregated_logits, feature_logits = model(x.to(device))
+                # calculate validation loss
+                loss = penalized_binary_cross_entropy(
+                    model,
+                    aggregated_logits,
+                    feature_logits,
+                    y.to(device),
+                    output_regularization=output_regularization,
+                    l2_regularization=l2_regularization,
+                )
+                y_pred.extend(
+                    (
+                        F.sigmoid(aggregated_logits.detach()).cpu().numpy() >= threshold
+                    ).astype(float)
+                )
 
             else:
                 logits = model(x.to(device))
-            probs = F.sigmoid(logits.detach()).cpu().numpy()
-            # use optimal threshold to assign class
-            y_pred.extend((probs >= threshold).astype(float))
+                y_pred.extend(
+                    (F.sigmoid(logits.detach()).cpu().numpy() >= threshold).astype(
+                        float
+                    )
+                )
 
-            loss = criterion(logits, y.to(device))
+                # calculate validation loss
+                loss = criterion(logits, y.to(device))
             test_loss += loss.item()
 
         test_loss /= len(test_loader)
@@ -396,7 +512,7 @@ def set_all_seeds(seed: int):
 # Custom Hidden Layer
 # -------------------------------
 #!!! We used and adapted the following tutorial on writing custom layers in pytorch:
-# https://auro-227.medium.com/writing-a-custom-layer-in-pytorch-14ab6ac94b77
+#!!! https://auro-227.medium.com/writing-a-custom-layer-in-pytorch-14ab6ac94b77
 class ExULayer(nn.Module):
     def __init__(self, in_size: int, out_size: int):
         """Exu hidden layer as described in the paper "Neural Additive Models:
@@ -446,3 +562,109 @@ class ReLUn(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return torch.clamp(F.relu(x), min=0, max=self.n)
+
+
+# -------------------------------
+# Calculate Number of Inputs
+# -------------------------------
+#!!! This function is based on the create_nam_model function of the code from the GitHub repository of the NAM paper:
+#!!! see: https://github.com/google-research/google-research/blob/master/neural_additive_models/graph_builder.py
+def get_n_units(
+    X_train: np.ndarray,
+    n_basis_functions: int = 1_000,
+    units_multiplier: int = 2,
+) -> List[int]:
+    """Get the number of input units for each feature for the NAM model.
+
+    Args:
+        X_train (np.ndarray): Preprocessed training data
+        n_basis_functions (int, optional): Number of basis functions. Defaults to 100.
+        units_multiplier (int, optional): Multiplier by which number of unique
+            values of feature get multiplied. Defaults to 2.
+
+    Returns:
+        List[int]: Input size for each feature for the NAM model
+    """
+    n_cols = X_train.shape[1]
+    n_unique_values = [len(np.unique(X_train[:, i])) for i in range(n_cols)]
+
+    return [min(n_basis_functions, i * units_multiplier) for i in n_unique_values]
+
+
+# -------------------------------
+# Custom Loss Function
+# -------------------------------
+#!!! This function is translated into PyTorch from the original TensorFlow implementation of the NAM paper:
+#!!! from https://github.com/google-research/google-research/blob/master/neural_additive_models/graph_builder.py#L84
+def feature_ouput_regularization(feature_logits: torch.Tensor) -> torch.Tensor:
+    """Calculate penalty term for the output of the feature networks.
+
+    Args:
+        feature_logits (torch.Tensor): Concatenated feature logits.
+
+    Returns:
+        torch.Tensor: Penalty term for the output of the feature networks.
+    """
+    per_feature_norm = torch.norm(feature_logits, dim=0, p=2)
+    return torch.sum(per_feature_norm) / len(per_feature_norm)
+
+
+#!!! This function is translated into PyTorch from the original TensorFlow implementation of the NAM paper:
+#!!! from https://github.com/google-research/google-research/blob/master/neural_additive_models/graph_builder.py#L84
+def weight_decay_feature_params(model: nn.Module, num_networks: int) -> torch.Tensor:
+    """Calculate penalty term for the weights of the feature networks.
+
+    Args:
+        model (nn.Module): NAM model.
+        num_networks (int): Number of feature networks.
+
+    Returns:
+        torch.Tensor: Penalty term for the weights of the feature networks
+    """
+    # note that tf.nn.l2_loss divides the squared Euclidean/Frobenius norm by 2
+    # for more information: https://www.tensorflow.org/api_docs/python/tf/nn/l2_loss
+    feature_weights_losses = [
+        torch.norm(param, p=2) ** 2 / 2
+        for param in model.parameters()
+        if param.requires_grad
+    ]
+    return torch.sum(torch.stack(feature_weights_losses)) / num_networks
+
+
+#!!! This function is translated into PyTorch from the original TensorFlow implementation of the NAM paper:
+#!!! from https://github.com/google-research/google-research/blob/master/neural_additive_models/graph_builder.py#L84
+def penalized_binary_cross_entropy(
+    model: nn.Module,
+    aggregated_logits: torch.Tensor,
+    feature_logits: torch.Tensor,
+    y_true: torch.Tensor,
+    output_regularization: float = 0.0,
+    l2_regularization: float = 0.0,
+) -> torch.Tensor:
+    """Get penalized binary cross entropy loss for an NAM model instance.
+
+    Args:
+        model (nn.Module): NAM model
+        aggregated_logits (torch.Tensor): Output of the NAM model/ aggregated logits.
+        feature_logits (torch.Tensor): Concatenate feature logits.
+        y_true (torch.Tensor): Batch labels
+        output_regularization (float, optional): Regularization coefficient
+            for feature logits. Defaults to 0.0.
+        l2_regularization (float, optional): Regularization coefficient for
+            feature network weights. Defaults to 0.0.
+
+    Returns:
+        torch.Tensor: Penalized binary cross entropy loss
+    """
+    loss = F.binary_cross_entropy_with_logits(aggregated_logits, y_true)
+    regularization_loss = 0.0
+    if output_regularization > 0.0:
+        regularization_loss += (
+            feature_ouput_regularization(feature_logits) * output_regularization
+        )
+    if l2_regularization > 0.0:
+        num_networks = feature_logits.shape[1]
+        regularization_loss += (
+            weight_decay_feature_params(model, num_networks) * l2_regularization
+        )
+    return loss + regularization_loss
