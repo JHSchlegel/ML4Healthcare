@@ -76,7 +76,7 @@ def get_best_threshold(probs: np.ndarray, y_true: np.ndarray) -> float:
 class EarlyStopping:
     def __init__(
         self,
-        best_model_path: str,
+        best_model_path: str = None,
         start: int = 50,
         patience: int = 20,
         epsilon: float = 1e-6,
@@ -89,7 +89,8 @@ class EarlyStopping:
         for class assignments.
 
         Args:
-            best_model_path (str): Where to save the best model
+            best_model_path (str): Where to save the best model. If best_model_path is
+                None, the model weights are not saved. Defaults to None.
             start (int): After how many epochs should early stopping be checked.
                 Defaults to 10.
             patience (int, optional): Number of epochs without improvement until
@@ -128,14 +129,17 @@ class EarlyStopping:
             self.best_model = model
             self.best_val_loss = val_loss
             # save current best model
-            torch.save(self.best_model.state_dict(), self.best_model_path)
+            if self.best_model_path is not None:
+                torch.save(self.best_model.state_dict(), self.best_model_path)
         elif current_epoch > self.start:
             self.counter += 1  # stop training if no improvement in a long time
             if self.counter >= self.patience:
                 return True
         return False
 
-    def _get_best_threshold(self, val_loader: DataLoader) -> float:
+    def _get_best_threshold(
+        self, val_loader: DataLoader, forward_returns_tuple: bool = False
+    ) -> float:
         """Get the optimal threshold for class assignments. Can then be used to assign
         an observation to class 0 if probs <= optimal threshold and to class 1 if
         probs > optimal threshold.
@@ -143,6 +147,8 @@ class EarlyStopping:
         Args:
             val_loader (DataLoader): Validation DataLoader containing validation
             data
+            forward_returns_tuple (bool): Whether the forward function of the model
+                returns a tuple (as the NAM class does) or not. Defaults to False.
 
         Returns:
             float: Optimal threshold
@@ -155,9 +161,13 @@ class EarlyStopping:
             for x, y in val_loader:
                 # add true labels and predicted model probabilities to list
                 y_true.extend(y.numpy())
-                model_probabilities.extend(
-                    F.sigmoid(self.best_model(x.to(self.device)).detach()).cpu().numpy()
-                )
+
+                if forward_returns_tuple:
+                    logits = self.best_model(x.to(self.device))[0]
+
+                else:
+                    logits = self.best_model(x.to(self.device))
+                model_probabilities.extend(F.sigmoid(logits.detach()).cpu().numpy())
         return get_best_threshold(np.array(model_probabilities), np.array(y_true))
 
 
@@ -172,6 +182,7 @@ def train_and_validate(
     criterion: nn.Module,
     n_epochs: int,
     ES: EarlyStopping,
+    forward_returns_tuple: bool = False,
     summary_writer: SummaryWriter = None,
     scheduler: torch.optim.lr_scheduler = None,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -189,6 +200,8 @@ def train_and_validate(
         n_epochs (int): Number of epochs to train for
         ES (EarlyStopping): EarlyStopping instance to use for early stopping
             and calculation of optimal threshold
+        forward_returns_tuple (bool): Whether the forward function of the model
+            returns a tuple (as the NAM class does) or not. Defaults to False.
         summary_writer (SummaryWriter, optional): SummaryWriter to log results
             of the training. Can then be used to visualize the progress in the tensorboard
             by typing `tensorboard --logdir EXPERIMENT_DIRNAME` in the terminal and
@@ -219,9 +232,13 @@ def train_and_validate(
             for x, y in train_loader:
                 optimizer.zero_grad()
 
-                y_pred = model(x.to(device))
+                if forward_returns_tuple:
+                    logits = model(x.to(device))[0]
 
-                loss = criterion(y_pred, y.to(device))
+                else:
+                    logits = model(x.to(device))
+
+                loss = criterion(logits, y.to(device))
                 loss.backward()
                 optimizer.step()
 
@@ -243,12 +260,14 @@ def train_and_validate(
                     y_true.extend(y.numpy())
                     # for predicted labels: use default threshold of 0.5
                     # threshold is tuned for the best model later on
-                    y_pred.extend(
-                        F.sigmoid(model(x.to(device)).detach()).cpu().numpy().round()
-                    )
+                    if forward_returns_tuple:
+                        logits = model(x.to(device))[0]
+                    else:
+                        logits = model(x.to(device))
+                    y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round())
 
                     # calculate validation loss
-                    loss = criterion(model(x.to(device)), y.to(device))
+                    loss = criterion(logits, y.to(device))
                     val_loss += loss.item()
                 # avg valdation loss
                 val_loss /= len(val_loader)
@@ -293,6 +312,7 @@ def test(
     model: nn.Module,
     test_loader: DataLoader,
     criterion: nn.Module,
+    forward_returns_tuple: bool = False,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     threshold: float = 0.5,
 ) -> Tuple[float, float, float]:
@@ -302,9 +322,12 @@ def test(
         model (nn.Module): A neural network model.
         test_loader (DataLoader): DataLoader object with test data.
         criterion (nn.Module):  Loss function.
+        forward_returns_tuple (bool): Whether the forward function of the model
+            returns a tuple (as the NAM class does) or not. Defaults to False.
         device (torch.device): Device to run the model on.
         threshold (float, optional): Optimal threshold for class assignment calculated
-        on the validation set. Defaults to 0.5.
+            on the validation set. Defaults to 0.5.
+
 
     Returns:
         Tuple[float, float, float]: Tuple with test loss, f1 score and balanced accuracy.
@@ -318,11 +341,16 @@ def test(
         for x, y in test_loader:
             y_true.extend(y.numpy())
             # calculate model probabilities
-            probs = F.sigmoid(model(x.to(device)).detach()).cpu().numpy()
+            if forward_returns_tuple:
+                logits = model(x.to(device))[0]
+
+            else:
+                logits = model(x.to(device))
+            probs = F.sigmoid(logits.detach()).cpu().numpy()
             # use optimal threshold to assign class
             y_pred.extend((probs >= threshold).astype(float))
 
-            loss = criterion(model(x.to(device)), y.to(device))
+            loss = criterion(logits, y.to(device))
             test_loss += loss.item()
 
         test_loss /= len(test_loader)

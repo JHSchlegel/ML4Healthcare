@@ -86,9 +86,9 @@ def main():
         n_features=X_train.shape[1],
         in_size=1,
         out_size=1,
-        hidden_profile=[128, 256, 512, 512, 256, 128],
-        use_exu=False,
-        use_relu_n=False,
+        hidden_profile=[32, 64, 64, 32],
+        use_exu=True,
+        use_relu_n=True,
         within_feature_dropout=0.3,
         feature_dropout=0.0,
     ).to(DEVICE)
@@ -116,6 +116,7 @@ def main():
         criterion,
         n_epochs=N_EPOCHS,
         ES=ES,
+        forward_returns_tuple=True,
         summary_writer=writer,
         scheduler=scheduler,
         device=DEVICE,
@@ -123,7 +124,14 @@ def main():
 
     set_all_seeds(SEED)
 
-    test(model, test_loader, criterion, device=DEVICE, threshold=best_threshold)
+    test(
+        model,
+        test_loader,
+        criterion,
+        forward_returns_tuple=True,
+        device=DEVICE,
+        threshold=best_threshold,
+    )
 
 
 if __name__ == "__main__":
