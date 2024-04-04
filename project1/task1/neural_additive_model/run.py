@@ -20,6 +20,8 @@ from utils.utils import (
     train_and_validate,
     test,
     EarlyStopping,
+    get_n_units,
+    penalized_binary_cross_entropy,
 )
 
 
@@ -34,14 +36,15 @@ def main():
         clean_columns
     )
     X_train = train_df.drop(columns=["heart_disease"], axis=1)
-    X_train = X_train.drop(366)
+    outlier_idx = X_train.query("resting_bp == 0").index
+    X_train = X_train.drop(outlier_idx)
     y_train = train_df["heart_disease"]
     y_train = y_train[X_train.index]
 
     # create categorical variable for cholesterol level
     X_train["chol_level"] = pd.cut(
         X_train["cholesterol"],
-        bins=[-1, 100, 200, 240, 1000],
+        bins=[-1, 10, 200, 240, 1000],
         labels=["imputed", "normal", "borderline", "high"],
     )
 
@@ -84,26 +87,29 @@ def main():
 
     model = NAM(
         n_features=X_train.shape[1],
-        in_size=1,
+        in_size=get_n_units(X_train),
         out_size=1,
         hidden_profile=[32, 64, 64, 32],
         use_exu=True,
         use_relu_n=True,
-        within_feature_dropout=0.3,
+        within_feature_dropout=0.1,
         feature_dropout=0.0,
     ).to(DEVICE)
     # use BCEWithLogitsLoss for numerical stability
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = penalized_binary_cross_entropy  # nn.BCEWithLogitsLoss()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=9.6e-5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 20, 0.95)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
 
     # visualize the progress in the tensorboard by typing
     # `tensorboard --logdir logs` in the terminal and then navigate
     # to the created process in the browser
     writer = SummaryWriter("logs/nam_experiment")
 
-    ES = EarlyStopping("../models/neural_additive_model.pth")
+    ES = EarlyStopping(
+        best_model_path="../models/neural_additive_model.pth",
+        epsilon=0.0,
+    )
 
     # Set seed for reproducibility
     set_all_seeds(SEED)
@@ -116,10 +122,12 @@ def main():
         criterion,
         n_epochs=N_EPOCHS,
         ES=ES,
-        forward_returns_tuple=True,
-        summary_writer=writer,
         scheduler=scheduler,
+        summary_writer=writer,
         device=DEVICE,
+        use_penalized_BCE=True,
+        output_regularization=0.0,
+        l2_regularization=0.0,  # 9.6e-5,
     )
 
     set_all_seeds(SEED)
@@ -128,9 +136,11 @@ def main():
         model,
         test_loader,
         criterion,
-        forward_returns_tuple=True,
         device=DEVICE,
         threshold=best_threshold,
+        use_penalized_BCE=True,
+        output_regularization=0.0,
+        l2_regularization=9.6e-5,
     )
 
 
