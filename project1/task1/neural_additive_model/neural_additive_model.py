@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
-from typing import List
+from typing import List, Tuple
 
 
 # append path to parent folder to allow imports from utils folder
@@ -86,7 +86,7 @@ class NAM(nn.Module):
         self.bias = Parameter(torch.Tensor(1))
         nn.init.constant_(self.bias, 0.0)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # !!! forward method inspired by:
         # https://github.com/kherud/neural-additive-models-pt/blob/master/nam/model.py
         single_logits = [
@@ -94,5 +94,5 @@ class NAM(nn.Module):
         ]
         # concatenate logits and add feature dropout
         concat_logits = self.feature_dropout(torch.concat(single_logits, dim=1))
-
-        return torch.sum(concat_logits, dim=1) + self.bias
+        # also
+        return torch.sum(concat_logits, dim=1) + self.bias, concat_logits
