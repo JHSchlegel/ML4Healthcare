@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from neural_additive_model import NAM
-from icecream import ic
 
 
 # append path to parent folder to allow imports from utils folder
@@ -89,11 +88,11 @@ def main():
         n_features=X_train.shape[1],
         in_size=get_n_units(X_train),
         out_size=1,
-        hidden_profile=[32, 64, 64, 32],
+        hidden_profile=[64, 64, 32],
         use_exu=True,
         use_relu_n=True,
         within_feature_dropout=0.1,
-        feature_dropout=0.0,
+        feature_dropout=0.1,
     ).to(DEVICE)
     # use BCEWithLogitsLoss for numerical stability
     criterion = penalized_binary_cross_entropy  # nn.BCEWithLogitsLoss()
@@ -115,19 +114,19 @@ def main():
     set_all_seeds(SEED)
 
     _, _, _, _, best_threshold = train_and_validate(
-        model,
-        train_loader,
-        val_loader,
-        optimizer,
-        criterion,
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        optimizer=optimizer,
+        criterion=criterion,
         n_epochs=N_EPOCHS,
         ES=ES,
         scheduler=scheduler,
         summary_writer=writer,
         device=DEVICE,
         use_penalized_BCE=True,
-        output_regularization=0.0,
-        l2_regularization=0.0,  # 9.6e-5,
+        output_regularization=1e-4,  # 0.0,
+        l2_regularization=9.6e-5,
     )
 
     set_all_seeds(SEED)
