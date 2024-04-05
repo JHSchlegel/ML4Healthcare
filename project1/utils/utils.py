@@ -187,7 +187,6 @@ def train_and_validate_one_epoch(
     val_loader: DataLoader,
     optimizer: torch.optim.Optimizer,
     criterion: nn.Module,
-    ES: EarlyStopping,
     use_penalized_BCE: bool = False,
     output_regularization: float = 0.0,
     l2_regularization: float = 0.0,
@@ -204,8 +203,6 @@ def train_and_validate_one_epoch(
         val_loader (DataLoader): DataLo0ader with validation data
         optimizer (torch.optim.Optimizer): Optimizer to minimize loss with
         criterion (nn.Module): Loss function to use
-        ES (EarlyStopping): EarlyStopping instance to use for early stopping
-            and calculation of optimal threshold
         use_penalized_BCE (bool): Whether the penalized Binary Cross Entropy for
             NAMs should be used. Defaults to False.
         output_regularization (float, optional): Regularization coefficient for
@@ -361,7 +358,6 @@ def train_and_validate(
                 val_loader,
                 optimizer,
                 criterion,
-                ES,
                 use_penalized_BCE,
                 output_regularization,
                 l2_regularization,
