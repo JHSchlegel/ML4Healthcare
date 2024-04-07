@@ -551,7 +551,7 @@ class LinearLayer(nn.Module):
         self.in_size, self.out_size = in_size, out_size
 
         self.weights = Parameter(torch.Tensor(in_size, out_size))
-        self.bias = Parameter(torch.Tensor(out_size))
+        self.bias = Parameter(torch.Tensor(in_size))
 
         # the NAM paper code initialized the weights using a glorot / Xavier
         # uniform initialization and the biases again with a truncated Normal with sdev=0.5
