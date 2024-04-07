@@ -3,12 +3,11 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from typing import List, Tuple
 
-
 # append path to parent folder to allow imports from utils folder
 import sys
 
 sys.path.append("../..")
-from utils.utils import ExULayer, ReLUn
+from utils.utils import ExULayer, ReLUn, LinearLayer
 
 
 class FeatureNet(nn.Module):
@@ -23,7 +22,7 @@ class FeatureNet(nn.Module):
     ):
         super(FeatureNet, self).__init__()
 
-        self.hidden_unit = ExULayer if use_exu else nn.Linear
+        self.hidden_unit = ExULayer if use_exu else LinearLayer
         self.activation = ReLUn if use_relu_n else nn.ReLU
 
         self.layers = []
@@ -87,6 +86,7 @@ class NAM(nn.Module):
 
         # dropout layer for features
         self.feature_dropout = nn.Dropout(feature_dropout)
+        self.in_size = in_size
 
         # bias term to add
         self.bias = Parameter(torch.Tensor(1))

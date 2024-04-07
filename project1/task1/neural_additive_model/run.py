@@ -24,9 +24,30 @@ from utils.utils import (
 )
 
 
+TRAIN_BATCH_SIZE = 32
+VAL_BATCH_SIZE = 128
+TEST_BATCH_SIZE = 128
+
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_EPOCHS = 1_000
+
+HIDDEN_PROFILE = [64, 64, 32]
+USE_EXU = False  # True
+USE_RELU_N = True
+WITHIN_FEATURE_DROPOUT = 0.2
+FEATURE_DROPOUT = 0.2
+
+
+LEARNING_RATE = 0.02  # 3e-4
+
+SCHEDULER_STEP_SIZE = 10
+SCHEDULER_GAMMA = 0.9
+
+OUTPUT_REGULARIZATION = 0.0018
+L2_REGULARIZATION = 1.5e5
+
+EARLY_STOPPING_START = 200
 
 
 def main():
@@ -75,30 +96,34 @@ def main():
     test_dataset = HeartFailureDataset(X_test, y_test)
 
     train_loader = DataLoader(
-        train_dataset, batch_size=32, shuffle=True, pin_memory=True
+        train_dataset, batch_size=TRAIN_BATCH_SIZE, shuffle=True, pin_memory=True
     )
 
-    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, pin_memory=True)
+    val_loader = DataLoader(
+        val_dataset, batch_size=VAL_BATCH_SIZE, shuffle=False, pin_memory=True
+    )
 
     test_loader = DataLoader(
-        test_dataset, batch_size=128, shuffle=False, pin_memory=True
+        test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False, pin_memory=True
     )
 
     model = NAM(
         n_features=X_train.shape[1],
         in_size=get_n_units(X_train),
         out_size=1,
-        hidden_profile=[64, 64, 32],
-        use_exu=True,
-        use_relu_n=True,
-        within_feature_dropout=0.1,
-        feature_dropout=0.1,
+        hidden_profile=HIDDEN_PROFILE,
+        use_exu=USE_EXU,
+        use_relu_n=USE_RELU_N,
+        within_feature_dropout=WITHIN_FEATURE_DROPOUT,
+        feature_dropout=FEATURE_DROPOUT,
     ).to(DEVICE)
     # use BCEWithLogitsLoss for numerical stability
-    criterion = penalized_binary_cross_entropy  # nn.BCEWithLogitsLoss()
+    criterion = penalized_binary_cross_entropy
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.9)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA
+    )
 
     # visualize the progress in the tensorboard by typing
     # `tensorboard --logdir logs` in the terminal and then navigate
@@ -107,6 +132,7 @@ def main():
 
     ES = EarlyStopping(
         best_model_path="../models/neural_additive_model.pth",
+        start=EARLY_STOPPING_START,
         epsilon=0.0,
     )
 
@@ -125,8 +151,8 @@ def main():
         summary_writer=writer,
         device=DEVICE,
         use_penalized_BCE=True,
-        output_regularization=1e-4,  # 0.0,
-        l2_regularization=9.6e-5,
+        output_regularization=OUTPUT_REGULARIZATION,
+        l2_regularization=L2_REGULARIZATION,
     )
 
     set_all_seeds(SEED)
@@ -138,8 +164,8 @@ def main():
         device=DEVICE,
         threshold=best_threshold,
         use_penalized_BCE=True,
-        output_regularization=0.0,
-        l2_regularization=9.6e-5,
+        output_regularization=OUTPUT_REGULARIZATION,
+        l2_regularization=L2_REGULARIZATION,
     )
 
 

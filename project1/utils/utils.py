@@ -390,8 +390,8 @@ def train_and_validate(
             if ES.early_stop(val_loss, model, i):
                 break
     # get optimal threshold for class assignment for the best model;
-    best_threshold = ES._get_best_threshold(val_loader, use_penalized_BCE)
-    return train_losses, val_losses, f1_scores, bal_accs, best_threshold
+    # best_threshold = ES._get_best_threshold(val_loader, use_penalized_BCE)
+    return train_losses, val_losses, f1_scores, bal_accs, 0.5  # best_threshold
 
 
 # -------------------------
@@ -525,19 +525,46 @@ class ExULayer(nn.Module):
         self.weights = Parameter(torch.Tensor(in_size, out_size))
         self.bias = Parameter(torch.Tensor(in_size))
 
-        # the original paper used a truncated normal with mean 4 and sd 0.5
-        # for ExU weight initialization.
+        # the original paper used a truncated normal with mean 4 and sdev=0.5
+        # for ExU weight initialization and a truncated normal with mean 0 and
+        # sdev=0.5 for bias initialization.
         # see: https://github.com/google-research/google-research/blob/master/neural_additive_models/models.py
         # used +- 2 standard deviations for a and b as in the tensorflow implementation
         # of truncated normal
         nn.init.trunc_normal_(self.weights, mean=4.0, std=0.5, a=3.0, b=5.0)
-        # if nothing specified (as in the github code of the nam paper (cf link above))
-        # the bias is initialized with zeros in tensorflow, see:
-        # https://stackoverflow.com/questions/40708169/how-to-initialize-biases-in-a-keras-model#:~:text=Weight%20and%20bias%20initialization%20for,bias_initializer%3D'zeros'%20are%20applied.
-        nn.init.constant_(self.bias, 0.0)
+        nn.init.trunc_normal_(self.bias, mean=0.0, std=0.5, a=-1.0, b=1.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return (x - self.bias) @ torch.exp(self.weights)
+
+
+class LinearLayer(nn.Module):
+    def __init__(self, in_size: int, out_size: int):
+        """Custom Linear hidden layer to avoid dimension mismatch in the NAM
+        model when using a linear layer.
+
+        Args:
+            in_size (int): Dimension of input tensor
+            out_size (int): Dimension of output tensor
+        """
+        super(LinearLayer, self).__init__()
+        self.in_size, self.out_size = in_size, out_size
+
+        self.weights = Parameter(torch.Tensor(in_size, out_size))
+        self.bias = Parameter(torch.Tensor(out_size))
+
+        # the NAM paper code initialized the weights using a glorot / Xavier
+        # uniform initialization and the biases again with a truncated Normal with sdev=0.5
+        # See the Activation Layer class of the followign link for more info:
+        # https://github.com/google-research/google-research/blob/master/neural_additive_models/models.py
+        nn.init.xavier_uniform_(self.weights)
+        nn.init.trunc_normal_(self.bias, mean=0.0, std=0.5, a=-1.0, b=1.0)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # !!! Had a look at the ReLULayer class of the following repository to
+        # !!! debug the dimension errors in the forward method:
+        # !!! https://github.com/kherud/neural-additive-models-pt/blob/master/nam/model.py
+        return (x - self.bias) @ self.weights
 
 
 # -------------------------------
@@ -621,8 +648,9 @@ def weight_decay_feature_params(model: nn.Module, num_networks: int) -> torch.Te
     # for more information: https://www.tensorflow.org/api_docs/python/tf/nn/l2_loss
     feature_weights_losses = [
         torch.norm(param, p=2) ** 2 / 2
-        for param in model.parameters()
-        if param.requires_grad
+        for name, param in model.named_parameters()
+        # only penalize weights that require gradients; don't penalize biases
+        if (param.requires_grad == True) and ("weights" in name)
     ]
     return torch.sum(torch.stack(feature_weights_losses)) / num_networks
 
