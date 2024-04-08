@@ -48,7 +48,8 @@ def main():
     )
 
     X_train, X_val, y_train, y_val = train_test_split(
-        X_train, y_train.to_numpy(), test_size=0.2, shuffle=True, random_state=SEED
+        X_train, y_train.to_numpy(), test_size=0.2, shuffle=True,
+        random_state=SEED, stratify=y_train
     )
 
     ## Load the test data
@@ -103,7 +104,7 @@ def main():
     # to the created process in the browser
     writer = SummaryWriter("logs/nam_experiment")
 
-    ES = EarlyStopping("../models/neural_additive_model.pth")
+    ES = EarlyStopping(best_model_path="../models/neural_additive_model.pth")
 
     # Set seed for reproducibility
     set_all_seeds(SEED)
