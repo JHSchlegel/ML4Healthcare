@@ -89,7 +89,7 @@ class NAM(nn.Module):
         self.in_size = in_size
 
         # bias term to add
-        self.bias = Parameter(torch.Tensor(1))
+        self.bias = Parameter(torch.Tensor(1), requires_grad=True)
         nn.init.constant_(self.bias, 0.0)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -100,6 +100,6 @@ class NAM(nn.Module):
             feature_net(input) for feature_net, input in zip(self.feature_nets, x.T)
         ]
         # concatenate logits of all features and add feature dropout
-        concat_logits = self.feature_dropout(torch.concat(single_logits, dim=1))
+        concat_logits = self.feature_dropout(torch.concat(single_logits, dim=-1))
         # also
         return torch.sum(concat_logits, dim=1) + self.bias, concat_logits

@@ -135,7 +135,7 @@ class EarlyStopping:
             self.best_val_loss = val_loss
             # save current best model
             if self.best_model_path is not None:
-                torch.save(self.best_model.state_dict(), self.best_model_path)
+                torch.save(self.best_model, self.best_model_path)
         elif current_epoch > self.start:
             self.counter += 1  # stop training if no improvement in a long time
             if self.counter >= self.patience:
@@ -390,8 +390,8 @@ def train_and_validate(
             if ES.early_stop(val_loss, model, i):
                 break
     # get optimal threshold for class assignment for the best model;
-    # best_threshold = ES._get_best_threshold(val_loader, use_penalized_BCE)
-    return train_losses, val_losses, f1_scores, bal_accs, 0.5  # best_threshold
+    best_threshold = ES._get_best_threshold(val_loader, use_penalized_BCE)
+    return train_losses, val_losses, f1_scores, bal_accs, best_threshold
 
 
 # -------------------------
@@ -535,7 +535,7 @@ class ExULayer(nn.Module):
         nn.init.trunc_normal_(self.bias, mean=0.0, std=0.5, a=-1.0, b=1.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return (x - self.bias) @ torch.exp(self.weights)
+        return torch.clamp((x - self.bias) @ torch.exp(self.weights), 0, 1)
 
 
 class LinearLayer(nn.Module):
@@ -561,9 +561,10 @@ class LinearLayer(nn.Module):
         nn.init.trunc_normal_(self.bias, mean=0.0, std=0.5, a=-1.0, b=1.0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # !!! Had a look at the ReLULayer class of the following repository to
+        # !!! We had a look at the ReLULayer class of the following repository to
         # !!! debug the dimension errors in the forward method:
         # !!! https://github.com/kherud/neural-additive-models-pt/blob/master/nam/model.py
+        # !!! we then copied "return (x - self.bias) @ self.weights" from there
         return (x - self.bias) @ self.weights
 
 

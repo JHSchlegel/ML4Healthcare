@@ -32,22 +32,24 @@ SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_EPOCHS = 1_000
 
-HIDDEN_PROFILE = [64, 64, 32]
-USE_EXU = False  # True
-USE_RELU_N = True
+HIDDEN_PROFILE = [1024]  # [128, 256, 256, 128]  # [1024]  #   #  [1024]
+USE_EXU = False
+USE_RELU_N = False
 WITHIN_FEATURE_DROPOUT = 0.2
-FEATURE_DROPOUT = 0.2
+FEATURE_DROPOUT = 0.0
 
 
-LEARNING_RATE = 0.02  # 3e-4
+LEARNING_RATE = 0.003
 
 SCHEDULER_STEP_SIZE = 10
 SCHEDULER_GAMMA = 0.9
 
-OUTPUT_REGULARIZATION = 0.0018
-L2_REGULARIZATION = 1.5e5
+CRITERION = penalized_binary_cross_entropy  # nn.BCEWithLogitsLoss()
 
-EARLY_STOPPING_START = 200
+OUTPUT_REGULARIZATION = 0.0018
+L2_REGULARIZATION = 9.6e-5  # 1.5e-5
+
+EARLY_STOPPING_START = 60  # 1000
 
 
 def main():
@@ -69,7 +71,12 @@ def main():
     )
 
     X_train, X_val, y_train, y_val = train_test_split(
-        X_train, y_train.to_numpy(), test_size=0.2, shuffle=True, random_state=SEED
+        X_train,
+        y_train.to_numpy(),
+        test_size=0.2,
+        shuffle=True,
+        random_state=SEED,
+        stratify=y_train,
     )
 
     ## Load the test data
@@ -107,6 +114,7 @@ def main():
         test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False, pin_memory=True
     )
 
+    set_all_seeds(SEED)
     model = NAM(
         n_features=X_train.shape[1],
         in_size=get_n_units(X_train),
@@ -117,8 +125,8 @@ def main():
         within_feature_dropout=WITHIN_FEATURE_DROPOUT,
         feature_dropout=FEATURE_DROPOUT,
     ).to(DEVICE)
-    # use BCEWithLogitsLoss for numerical stability
-    criterion = penalized_binary_cross_entropy
+
+    criterion = CRITERION
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.StepLR(
@@ -133,7 +141,7 @@ def main():
     ES = EarlyStopping(
         best_model_path="../models/neural_additive_model.pth",
         start=EARLY_STOPPING_START,
-        epsilon=0.0,
+        epsilon=1e-6,  # 0.0,
     )
 
     # Set seed for reproducibility
@@ -154,6 +162,7 @@ def main():
         output_regularization=OUTPUT_REGULARIZATION,
         l2_regularization=L2_REGULARIZATION,
     )
+    print(best_threshold)
 
     set_all_seeds(SEED)
 
