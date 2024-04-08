@@ -6,14 +6,15 @@ import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
-#from neural_additive_model import NAM
+from mlp import MLP
 from icecream import ic
 import os
 
 # append path to parent folder to allow imports from utils folder
 import sys
 
-sys.path.append("\\utils\\utils.py")
+sys.path.append("..")
+
 from utils.utils import (
     set_all_seeds,
     HeartFailureDataset,
@@ -22,14 +23,11 @@ from utils.utils import (
     EarlyStopping,
 )
 
-#Note: Alt t should work, but doesn't see article
-#Somehow the directory doesn't exist
-
 
 
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-N_EPOCHS = 1_000
+N_EPOCHS = 500
 
 
 def main():
@@ -64,7 +62,6 @@ def main():
     )
     y_test = test_df["heart_disease"].to_numpy()
 
-    # ----- Note Paul: I deactivated the preprocessor for now:
     # load and apply preprocessor:
     preprocessor = load(open("../models/preprocessor.pkl", "rb"))
 
@@ -87,16 +84,14 @@ def main():
         test_dataset, batch_size=128, shuffle=False, pin_memory=True
     )
 
-    model = NAM(
-        n_features=X_train.shape[1],
-        in_size=1,
+    
+    model = MLP(
+        in_size=25,
         out_size=1,
         hidden_profile=[32, 64, 64, 32],
-        use_exu=True,
-        use_relu_n=True,
-        within_feature_dropout=0.3,
-        feature_dropout=0.0,
+        dropout=0.3
     ).to(DEVICE)
+    
     # use BCEWithLogitsLoss for numerical stability
     criterion = nn.BCEWithLogitsLoss()
 
@@ -121,7 +116,8 @@ def main():
         criterion,
         n_epochs=N_EPOCHS,
         ES=ES,
-        forward_returns_tuple=True,
+        #forward_returns_tuple=True
+        forward_returns_tuple=False,
         summary_writer=writer,
         scheduler=scheduler,
         device=DEVICE,
@@ -133,7 +129,8 @@ def main():
         model,
         test_loader,
         criterion,
-        forward_returns_tuple=True,
+        #forward_returns_tuple=True,
+        forward_returns_tuple=False,
         device=DEVICE,
         threshold=best_threshold,
     )
