@@ -116,6 +116,7 @@ plt.ylabel('True Positive Rate')
 plt.title('ROC curve')
 # write the AUC in the plot
 plt.annotate(f"AUC = {roc_auc:.2f}", (0.6, 0.4))
+
 plt.show()
 
 #%%
