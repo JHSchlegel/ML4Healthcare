@@ -439,7 +439,6 @@ def test(
     print(f"Test F1 Score: {f1}")
     print(f"Test Balanced Accuracy: {bal_acc}")
     
-    print(type(model_probs))
     
     return test_loss, f1, bal_acc, np.array(model_probs), np.array(y_true)
 
