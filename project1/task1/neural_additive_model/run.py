@@ -11,8 +11,6 @@ from neural_additive_model import NAM
 
 # append path to parent folder to allow imports from utils folder
 import sys
-import os
-
 
 sys.path.append("../..")
 from utils.utils import (
@@ -116,7 +114,10 @@ def main():
         test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False, pin_memory=True
     )
 
+    # set all possible seeds for reproducibility in pytorch
     set_all_seeds(SEED)
+
+    # instantiate neural additive model
     model = NAM(
         n_features=X_train.shape[1],
         in_size=get_n_units(X_train),
@@ -128,6 +129,7 @@ def main():
         feature_dropout=FEATURE_DROPOUT,
     ).to(DEVICE)
 
+    # instantiate loss function and optimizer
     criterion = CRITERION
 
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -140,15 +142,15 @@ def main():
     # to the created process in the browser
     writer = SummaryWriter("logs/nam_experiment")
 
+    # instantiate early stopping class
     ES = EarlyStopping(
         best_model_path="../models/neural_additive_model.pth",
         start=EARLY_STOPPING_START,
-        epsilon=1e-6,  
+        epsilon=1e-6,
     )
 
-    # Set seed for reproducibility
-    set_all_seeds(SEED)
-
+    # train the model on the training data and validate on the validation data
+    # the best model is saved in the best_model_path using the ES object from above
     train_and_validate(
         model=model,
         train_loader=train_loader,
@@ -165,7 +167,6 @@ def main():
         l2_regularization=L2_REGULARIZATION,
     )
 
-
     test_loss, test_f1_score, balanced_accuracy, model_probs, y_true = test(
         model,
         test_loader,
@@ -175,13 +176,12 @@ def main():
         output_regularization=OUTPUT_REGULARIZATION,
         l2_regularization=L2_REGULARIZATION,
     )
-    
+
     # confusion matrix:
     # TODO: add to experiments.ipynb and make it look nice
     from sklearn.metrics import confusion_matrix
-    
+
     print(confusion_matrix(y_true, model_probs.round()))
-    
 
 
 if __name__ == "__main__":
