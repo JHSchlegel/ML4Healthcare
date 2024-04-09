@@ -141,7 +141,7 @@ def main():
     writer = SummaryWriter("logs/nam_experiment")
 
     ES = EarlyStopping(
-        #best_model_path="../models/neural_additive_model.pth",
+        best_model_path="../models/neural_additive_model.pth",
         start=EARLY_STOPPING_START,
         epsilon=1e-6,  
     )
