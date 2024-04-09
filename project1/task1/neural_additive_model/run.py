@@ -7,25 +7,51 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from neural_additive_model import NAM
-from icecream import ic
+from sklearn.metrics import confusion_matrix
 
 
 # append path to parent folder to allow imports from utils folder
 import sys
 
-sys.path.append("..")
+sys.path.append("../..")
 from utils.utils import (
     set_all_seeds,
     HeartFailureDataset,
     train_and_validate,
     test,
     EarlyStopping,
+    get_n_units,
+    penalized_binary_cross_entropy,
 )
 
+
+TRAIN_BATCH_SIZE = 32
+VAL_BATCH_SIZE = 128
+TEST_BATCH_SIZE = 128
 
 SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_EPOCHS = 1_000
+
+HIDDEN_PROFILE = [1024]
+USE_EXU = False
+USE_RELU_N = False
+WITHIN_FEATURE_DROPOUT = 0.4
+FEATURE_DROPOUT = 0.0
+
+
+LEARNING_RATE = 0.003
+
+SCHEDULER_STEP_SIZE = 10
+SCHEDULER_GAMMA = 0.9
+
+OPTIMIZER = torch.optim.Adam
+CRITERION = penalized_binary_cross_entropy
+
+OUTPUT_REGULARIZATION = 0.0058
+L2_REGULARIZATION = 3.87e-5
+
+EARLY_STOPPING_START = 60
 
 
 def main():
@@ -34,19 +60,25 @@ def main():
         clean_columns
     )
     X_train = train_df.drop(columns=["heart_disease"], axis=1)
-    X_train = X_train.drop(366)
+    outlier_idx = X_train.query("resting_bp == 0").index
+    X_train = X_train.drop(outlier_idx)
     y_train = train_df["heart_disease"]
     y_train = y_train[X_train.index]
 
     # create categorical variable for cholesterol level
     X_train["chol_level"] = pd.cut(
         X_train["cholesterol"],
-        bins=[-1, 100, 200, 240, 1000],
+        bins=[-1, 10, 200, 240, 1000],
         labels=["imputed", "normal", "borderline", "high"],
     )
 
     X_train, X_val, y_train, y_val = train_test_split(
-        X_train, y_train.to_numpy(), test_size=0.2, shuffle=True, random_state=SEED
+        X_train,
+        y_train.to_numpy(),
+        test_size=0.2,
+        shuffle=True,
+        random_state=SEED,
+        stratify=y_train,
     )
 
     ## Load the test data
@@ -73,65 +105,82 @@ def main():
     test_dataset = HeartFailureDataset(X_test, y_test)
 
     train_loader = DataLoader(
-        train_dataset, batch_size=32, shuffle=True, pin_memory=True
+        train_dataset, batch_size=TRAIN_BATCH_SIZE, shuffle=True, pin_memory=True
     )
 
-    val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, pin_memory=True)
+    val_loader = DataLoader(
+        val_dataset, batch_size=VAL_BATCH_SIZE, shuffle=False, pin_memory=True
+    )
 
     test_loader = DataLoader(
-        test_dataset, batch_size=128, shuffle=False, pin_memory=True
+        test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False, pin_memory=True
     )
 
+    # set all possible seeds for reproducibility in pytorch
+    set_all_seeds(SEED)
+
+    # instantiate neural additive model
     model = NAM(
         n_features=X_train.shape[1],
-        in_size=1,
+        in_size=get_n_units(X_train),
         out_size=1,
-        hidden_profile=[32, 64, 64, 32],
-        use_exu=True,
-        use_relu_n=True,
-        within_feature_dropout=0.3,
-        feature_dropout=0.0,
+        hidden_profile=HIDDEN_PROFILE,
+        use_exu=USE_EXU,
+        use_relu_n=USE_RELU_N,
+        within_feature_dropout=WITHIN_FEATURE_DROPOUT,
+        feature_dropout=FEATURE_DROPOUT,
     ).to(DEVICE)
-    # use BCEWithLogitsLoss for numerical stability
-    criterion = nn.BCEWithLogitsLoss()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=9.6e-5)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 20, 0.95)
+    # instantiate loss function and optimizer
+    criterion = CRITERION
+
+    optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA
+    )
 
     # visualize the progress in the tensorboard by typing
     # `tensorboard --logdir logs` in the terminal and then navigate
     # to the created process in the browser
     writer = SummaryWriter("logs/nam_experiment")
 
-    ES = EarlyStopping("../models/neural_additive_model.pth")
+    # instantiate early stopping class
+    ES = EarlyStopping(
+        best_model_path="../models/neural_additive_model.pth",
+        start=EARLY_STOPPING_START,
+        epsilon=1e-6,
+    )
 
-    # Set seed for reproducibility
-    set_all_seeds(SEED)
-
-    _, _, _, _, best_threshold = train_and_validate(
-        model,
-        train_loader,
-        val_loader,
-        optimizer,
-        criterion,
+    # train the model on the training data and validate on the validation data
+    # the best model is saved in the best_model_path using the ES object from above
+    train_and_validate(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        optimizer=optimizer,
+        criterion=criterion,
         n_epochs=N_EPOCHS,
         ES=ES,
-        forward_returns_tuple=True,
-        summary_writer=writer,
         scheduler=scheduler,
+        summary_writer=writer,
         device=DEVICE,
+        use_penalized_BCE=True,
+        output_regularization=OUTPUT_REGULARIZATION,
+        l2_regularization=L2_REGULARIZATION,
     )
 
-    set_all_seeds(SEED)
-
-    test(
-        model,
-        test_loader,
-        criterion,
-        forward_returns_tuple=True,
+    test_loss, test_f1_score, balanced_accuracy, model_probs, y_true = test(
+        model=model,
+        test_loader=test_loader,
+        criterion=criterion,
         device=DEVICE,
-        threshold=best_threshold,
+        use_penalized_BCE=True,
+        output_regularization=OUTPUT_REGULARIZATION,
+        l2_regularization=L2_REGULARIZATION,
     )
+
+    # confusion matrix:
+    print(confusion_matrix(y_true, model_probs.round()))
 
 
 if __name__ == "__main__":
