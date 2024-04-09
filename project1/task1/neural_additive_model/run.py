@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from neural_additive_model import NAM
+from sklearn.metrics import confusion_matrix
 
 
 # append path to parent folder to allow imports from utils folder
@@ -44,6 +45,7 @@ LEARNING_RATE = 0.003
 SCHEDULER_STEP_SIZE = 10
 SCHEDULER_GAMMA = 0.9
 
+OPTIMIZER = torch.optim.Adam
 CRITERION = penalized_binary_cross_entropy
 
 OUTPUT_REGULARIZATION = 0.0058
@@ -132,7 +134,7 @@ def main():
     # instantiate loss function and optimizer
     criterion = CRITERION
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA
     )
@@ -168,9 +170,9 @@ def main():
     )
 
     test_loss, test_f1_score, balanced_accuracy, model_probs, y_true = test(
-        model,
-        test_loader,
-        criterion,
+        model=model,
+        test_loader=test_loader,
+        criterion=criterion,
         device=DEVICE,
         use_penalized_BCE=True,
         output_regularization=OUTPUT_REGULARIZATION,
@@ -178,9 +180,6 @@ def main():
     )
 
     # confusion matrix:
-    # TODO: add to experiments.ipynb and make it look nice
-    from sklearn.metrics import confusion_matrix
-
     print(confusion_matrix(y_true, model_probs.round()))
 
 

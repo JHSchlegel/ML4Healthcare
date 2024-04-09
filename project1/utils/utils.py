@@ -1,4 +1,4 @@
-# This file includes the utility functions for the neural additive model and
+# This file includes the utility functions for the neural additive model, CNN and
 # the MLP:
 
 # in the following, whenever we refer to the "NAM paper", we mean the following paper:
@@ -12,13 +12,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.parameter import Parameter
-from tqdm import trange
+from tqdm import trange, tqdm
 import random
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import f1_score, balanced_accuracy_score, precision_recall_curve
 import os
 from typing import Tuple, List
+from PIL import Image
+import torchvision
 
 
 # ==========================================================================
@@ -27,7 +29,44 @@ from typing import Tuple, List
 
 
 # -------------------------
-# Custom Dataset
+# Loading in Pneumonia Images
+# -------------------------
+def get_pneumonia_images(
+    folder_path: str,
+    img_size: Tuple[int, int] = (256, 256),
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Reads the images and labels from the folder
+
+    Args:
+        folder_path (str): Path to the folder containing train/val/test images
+        img_size (Tuple[int, int], optional): Rescaled size of images. Defaults to (256, 256).
+
+    Returns:
+        Tuple[List[Image], np.ndarray]: A tuple of the images as np.ndarray
+                    and the labels as np.ndarray
+    """
+    images = []
+    labels = []
+
+    for i, subfolder in enumerate(["NORMAL", "PNEUMONIA"]):
+        for file in tqdm(
+            os.listdir(os.path.join(folder_path, subfolder)),
+            desc=f"Reading {subfolder} {folder_path.split('/')[-1]} images",
+        ):
+
+            # read in images using PIL
+            with Image.open(os.path.join(folder_path, subfolder, file)) as img:
+                # resize image and make ensure that it has 3 channels/ is in RGB format
+                img = img.resize(img_size).convert("RGB")
+                images.append(img)
+
+            labels.append(i)
+
+    return images, np.array(labels)
+
+
+# -------------------------
+# Custom Datasets
 # -------------------------
 class HeartFailureDataset(Dataset):
     def __init__(self, X: np.ndarray, y: np.ndarray):
@@ -47,30 +86,35 @@ class HeartFailureDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
-# -------------------------
-# Find Best Threshold
-# -------------------------
-#!!! inspired by the following data science stack exchange post:
-#!!! https://datascience.stackexchange.com/questions/96690/how-to-choose-the-right-threshold-for-binary-classification
-def get_best_threshold(probs: np.ndarray, y_true: np.ndarray) -> float:
-    """Get the optimal threshold for class assignments w.r.t f1_score.
-        Can then be used to assign an observation to class 0 if
-        probs <= optimal threshold and to class 1 if probs > optimal threshold.
+class PneumoniaDataset(Dataset):
+    def __init__(
+        self,
+        images: List[Image.Image],
+        labels: np.ndarray,
+        transforms: torchvision.transforms = None,
+    ):
+        """Create torch Dataset from images and labels
 
-    Args:
-        probs (np.ndarray): Predicted probabilities for each class
-        y_true (np.ndarray): True labels
+        Args:
+            images (List[Image]): List of images
+            labels (np.ndarray): List of labels
+            transforms (torchvision.transforms): Transforms to apply to the images.
+                Defaults to None.
+        """
+        self.images = images
+        self.labels = torch.from_numpy(labels).float()
+        self.transforms = transforms
 
-    Returns:
-        float: Optimal threshold w.r.t. f1_score
-    """
-    precision, recall, thresh = precision_recall_curve(y_true, probs)
+    def __len__(self):
+        return len(self.images)
 
-    # calculate f1 score for every threshold
-    # have to remove last element of precision and recall as it is only there
-    # to ensure full coverage but there is no corresponding threshold for these values
-    f1 = (2 * precision[:-1] * recall[:-1]) / (precision[:-1] + recall[:-1])
-    return thresh[np.argmax(f1)]
+    def __getitem__(self, idx):
+        image, label = self.images[idx], self.labels[idx]
+
+        if self.transforms is not None:
+            image = self.transforms(image)
+
+        return image, label
 
 
 # -------------------------
@@ -102,7 +146,8 @@ class EarlyStopping:
             training process is stopped early. Defaults to 20.
             epsilon (float, optional): Tolerance of improvement to avoid stopping
                 solely because of numerical issues. Defaults to 1e-6.
-            device (torch.device, optional): Device to run the model on. Defaults to torch.device( "cuda" if torch.cuda.is_available() else "cpu" ).
+            device (torch.device, optional): Device to run the model on.
+                Defaults to torch.device( "cuda" if torch.cuda.is_available() else "cpu" ).
         """
         self.best_model_path = best_model_path
         self.start = start
@@ -135,7 +180,7 @@ class EarlyStopping:
             self.best_val_loss = val_loss
             # save current best model
             if self.best_model_path is not None:
-                torch.save(self.best_model, self.best_model_path)
+                torch.save(self.best_model.state_dict(), self.best_model_path)
         elif current_epoch > self.start:
             self.counter += 1  # stop training if no improvement in a long time
             if self.counter >= self.patience:
@@ -383,7 +428,7 @@ def test(
 
 
     Returns:
-        Tuple[float, float, float, np.ndarray, np.ndarray]: Tuple with test loss, 
+        Tuple[float, float, float, np.ndarray, np.ndarray]: Tuple with test loss,
             f1 score and balanced accuracy, model probabilities and true y's
     """
     test_loss = 0.0
@@ -407,23 +452,18 @@ def test(
                     output_regularization=output_regularization,
                     l2_regularization=l2_regularization,
                 )
-                
+
                 probs = F.sigmoid(aggregated_logits.detach()).cpu().numpy()
                 model_probs.extend(probs)
-                
-                y_pred.extend(
-                    (
-                        probs.round()
-                    ).astype(float)
-                )
+
+                y_pred.extend((probs.round()).astype(float))
 
             else:
                 logits = model(x.to(device))
-                y_pred.extend(
-                    (F.sigmoid(logits.detach()).cpu().numpy().round()).astype(
-                        float
-                    )
-                )
+                probs = F.sigmoid(logits.detach()).cpu().numpy()
+                model_probs.extend(probs)
+
+                y_pred.extend((probs.round()).astype(float))
 
                 # calculate validation loss
                 loss = criterion(logits, y.to(device))
@@ -438,8 +478,7 @@ def test(
     print(f"Test Loss: {test_loss}")
     print(f"Test F1 Score: {f1}")
     print(f"Test Balanced Accuracy: {bal_acc}")
-    
-    
+
     return test_loss, f1, bal_acc, np.array(model_probs), np.array(y_true)
 
 
