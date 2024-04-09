@@ -32,10 +32,10 @@ SEED = 42
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_EPOCHS = 1_000
 
-HIDDEN_PROFILE = [1024]  # [128, 256, 256, 128]  # [1024]  #   #  [1024]
+HIDDEN_PROFILE = [1024]
 USE_EXU = False
 USE_RELU_N = False
-WITHIN_FEATURE_DROPOUT = 0.2
+WITHIN_FEATURE_DROPOUT = 0.4
 FEATURE_DROPOUT = 0.0
 
 
@@ -44,12 +44,12 @@ LEARNING_RATE = 0.003
 SCHEDULER_STEP_SIZE = 10
 SCHEDULER_GAMMA = 0.9
 
-CRITERION = penalized_binary_cross_entropy  # nn.BCEWithLogitsLoss()
+CRITERION = penalized_binary_cross_entropy
 
-OUTPUT_REGULARIZATION = 0.0018
-L2_REGULARIZATION = 9.6e-5  # 1.5e-5
+OUTPUT_REGULARIZATION = 0.0058
+L2_REGULARIZATION = 3.87e-5
 
-EARLY_STOPPING_START = 60  # 1000
+EARLY_STOPPING_START = 60
 
 
 def main():
@@ -171,7 +171,7 @@ def main():
         test_loader,
         criterion,
         device=DEVICE,
-        threshold=best_threshold,
+        # threshold=best_threshold,
         use_penalized_BCE=True,
         output_regularization=OUTPUT_REGULARIZATION,
         l2_regularization=L2_REGULARIZATION,
