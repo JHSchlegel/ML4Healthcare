@@ -11,6 +11,8 @@ from neural_additive_model import NAM
 
 # append path to parent folder to allow imports from utils folder
 import sys
+import os
+
 
 sys.path.append("../..")
 from utils.utils import (
@@ -139,15 +141,15 @@ def main():
     writer = SummaryWriter("logs/nam_experiment")
 
     ES = EarlyStopping(
-        best_model_path="../models/neural_additive_model.pth",
+        #best_model_path="../models/neural_additive_model.pth",
         start=EARLY_STOPPING_START,
-        epsilon=1e-6,  # 0.0,
+        epsilon=1e-6,  
     )
 
     # Set seed for reproducibility
     set_all_seeds(SEED)
 
-    _, _, _, _, best_threshold = train_and_validate(
+    train_and_validate(
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -162,20 +164,24 @@ def main():
         output_regularization=OUTPUT_REGULARIZATION,
         l2_regularization=L2_REGULARIZATION,
     )
-    print(best_threshold)
 
-    set_all_seeds(SEED)
 
-    test(
+    test_loss, test_f1_score, balanced_accuracy, model_probs, y_true = test(
         model,
         test_loader,
         criterion,
         device=DEVICE,
-        # threshold=best_threshold,
         use_penalized_BCE=True,
         output_regularization=OUTPUT_REGULARIZATION,
         l2_regularization=L2_REGULARIZATION,
     )
+    
+    # confusion matrix:
+    # TODO: add to experiments.ipynb and make it look nice
+    from sklearn.metrics import confusion_matrix
+    
+    print(confusion_matrix(y_true, model_probs.round()))
+    
 
 
 if __name__ == "__main__":

@@ -142,41 +142,6 @@ class EarlyStopping:
                 return True
         return False
 
-    def _get_best_threshold(
-        self,
-        val_loader: DataLoader,
-        use_penalized_BCE: bool = False,
-    ) -> float:
-        """Get the optimal threshold for class assignments w.r.t. f1_score. Can then be used to assign
-            an observation to class 0 if probs <= optimal threshold and to class 1 if
-            probs > optimal threshold.
-
-        Args:
-            val_loader (DataLoader): Validation DataLoader containing validation
-            data
-            use_penalized_BCE (bool): Whether the forward function of the model
-                returns a tuple (as the NAM class does) or not. Defaults to False.
-
-        Returns:
-            float: Optimal threshold w.r.t. f1_score
-        """
-        y_true = []
-        model_probabilities = []
-        with torch.no_grad():
-            # set model to eval mode to disable dropout during validation
-            self.best_model.eval()
-            for x, y in val_loader:
-                # add true labels and predicted model probabilities to list
-                y_true.extend(y.numpy())
-
-                if use_penalized_BCE:
-                    logits = self.best_model(x.to(self.device))[0]
-
-                else:
-                    logits = self.best_model(x.to(self.device))
-                model_probabilities.extend(F.sigmoid(logits.detach()).cpu().numpy())
-        return get_best_threshold(np.array(model_probabilities), np.array(y_true))
-
 
 # -------------------------
 # Train Loop
@@ -309,8 +274,7 @@ def train_and_validate(
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> Tuple[List[float], List[float], List[float], List[float], float]:
     """Train loop for the model. Returns the train loss, validation loss, validation f1 scores and
-    validation balanced accuracie scores over time and the optimal threshold
-    for class assignments (calculated on the validation set).
+        validation balanced accuracie scores over time.
 
     Args:
         model (nn.Module): Neural network model
@@ -336,9 +300,7 @@ def train_and_validate(
 
     Returns:
         Tuple[List[float], List[float], List[float], List[float], float]:
-            Returns the train loss, validation loss, validation f1 scores and
-            validation balanced accuracie scores over time and the optimal threshold
-            for class assignments (calculated on the validation set).
+            Returns the train loss, validation loss and validation f1 scores.
     """
 
     # initialize metrics
@@ -389,9 +351,8 @@ def train_and_validate(
             # check whether training should be stopped early:
             if ES.early_stop(val_loss, model, i):
                 break
-    # get optimal threshold for class assignment for the best model;
-    best_threshold = ES._get_best_threshold(val_loader, use_penalized_BCE)
-    return train_losses, val_losses, f1_scores, bal_accs, best_threshold
+
+    return train_losses, val_losses, f1_scores, bal_accs
 
 
 # -------------------------
@@ -405,7 +366,6 @@ def test(
     output_regularization: float = 0.0,
     l2_regularization: float = 0.0,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    threshold: float = 0.5,
 ) -> Tuple[float, float, float]:
     """Test loop for the model. Returns the test loss, f1 score and balanced accuracy.
 
@@ -420,16 +380,16 @@ def test(
         l2_regularization (float, optional): Regularization coefficient for
             penalized Binary Cross Entropy. Defaults to 0.0.
         device (torch.device): Device to run the model on.
-        threshold (float, optional): Optimal threshold for class assignment calculated
-            on the validation set. Defaults to 0.5.
 
 
     Returns:
-        Tuple[float, float, float]: Tuple with test loss, f1 score and balanced accuracy.
+        Tuple[float, float, float, np.ndarray, np.ndarray]: Tuple with test loss, 
+            f1 score and balanced accuracy, model probabilities and true y's
     """
     test_loss = 0.0
     y_true = []
     y_pred = []
+    model_probs = []
     with torch.no_grad():
         # set model to eval mode to disable dropout during validation
         model.eval()
@@ -447,16 +407,20 @@ def test(
                     output_regularization=output_regularization,
                     l2_regularization=l2_regularization,
                 )
+                
+                probs = F.sigmoid(aggregated_logits.detach()).cpu().numpy()
+                model_probs.extend(probs)
+                
                 y_pred.extend(
                     (
-                        F.sigmoid(aggregated_logits.detach()).cpu().numpy() >= threshold
+                        probs.round()
                     ).astype(float)
                 )
 
             else:
                 logits = model(x.to(device))
                 y_pred.extend(
-                    (F.sigmoid(logits.detach()).cpu().numpy() >= threshold).astype(
+                    (F.sigmoid(logits.detach()).cpu().numpy().round()).astype(
                         float
                     )
                 )
@@ -474,8 +438,10 @@ def test(
     print(f"Test Loss: {test_loss}")
     print(f"Test F1 Score: {f1}")
     print(f"Test Balanced Accuracy: {bal_acc}")
-
-    return test_loss, f1, bal_acc
+    
+    print(type(model_probs))
+    
+    return test_loss, f1, bal_acc, np.array(model_probs), np.array(y_true)
 
 
 # -------------------------------
