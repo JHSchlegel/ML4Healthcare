@@ -53,6 +53,7 @@ pipreqs . --force
 - [Contributors](#contributors)
 - [Setup](#setup)
 - [Project Structure](#project-structure)
+- [Code References](#code-references)
 
 ## Contributors
 
@@ -73,3 +74,6 @@ conda install --file requirements.txt
 ## Project Structure
 
 ## Source Code Directory Tree
+
+## Code References
+In our code files, we have included comments to cite references whenever we ahve ve incorporated, adapted, or been inspired by external code snippets.

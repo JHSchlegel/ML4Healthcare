@@ -3,19 +3,18 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from typing import List, Tuple
 
-
 # append path to parent folder to allow imports from utils folder
 import sys
 
-sys.path.append("..")
-from utils.utils import ExULayer, ReLUn
+sys.path.append("../..")
+from utils.utils import ExULayer, ReLUn, LinearLayer
 
 
 class FeatureNet(nn.Module):
     def __init__(
         self,
         in_size: int,
-        out_size: int = 2,
+        out_size: int = 1,
         hidden_profile: List[int] = [1024],
         use_exu: bool = True,
         use_relu_n: bool = True,
@@ -23,7 +22,7 @@ class FeatureNet(nn.Module):
     ):
         super(FeatureNet, self).__init__()
 
-        self.hidden_unit = ExULayer if use_exu else nn.Linear
+        self.hidden_unit = ExULayer if use_exu else LinearLayer
         self.activation = ReLUn if use_relu_n else nn.ReLU
 
         self.layers = []
@@ -41,11 +40,17 @@ class FeatureNet(nn.Module):
             self.layers.append(nn.Dropout(dropout))
 
         # add output layer
-        self.layers.append(nn.Linear(hidden_profile[-1], out_size))
+        # no bias neuron as in the build method of the FeatureNN class of the
+        # repository of the code for the NAM paper:
+        # see: https://github.com/google-research/google-research/blob/master/neural_additive_models/models.py
+        self.layers.append(nn.Linear(hidden_profile[-1], out_size, bias=False))
 
         self.nn = nn.Sequential(*self.layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # for debugging the dimensions in the forward method, we had a look at
+        # the forward method of the FeatureNN class in the following repository:
+        # https://github.com/kherud/neural-additive-models-pt/blob/master/nam/model.py
         # no sigmoid for numerical stability and use nn.BCEWithLogitsLoss
         # for integrated log-sum-exp trick
         return self.nn(x.unsqueeze(1))
@@ -55,7 +60,7 @@ class NAM(nn.Module):
     def __init__(
         self,
         n_features: int,
-        in_size: int,
+        in_size: List[int],
         out_size: int = 1,
         hidden_profile: List[int] = [1024],
         use_exu: bool = True,
@@ -68,31 +73,33 @@ class NAM(nn.Module):
         self.feature_nets = nn.ModuleList(
             [
                 FeatureNet(
-                    in_size=in_size,
+                    in_size=in_size[i],
                     out_size=out_size,
                     hidden_profile=hidden_profile,
                     use_exu=use_exu,
                     use_relu_n=use_relu_n,
                     dropout=within_feature_dropout,
                 )
-                for _ in range(n_features)
+                for i in range(n_features)
             ]
         )
 
         # dropout layer for features
         self.feature_dropout = nn.Dropout(feature_dropout)
+        self.in_size = in_size
 
         # bias term to add
-        self.bias = Parameter(torch.Tensor(1))
+        self.bias = Parameter(torch.Tensor(1), requires_grad=True)
         nn.init.constant_(self.bias, 0.0)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # !!! forward method inspired by:
         # https://github.com/kherud/neural-additive-models-pt/blob/master/nam/model.py
+        # logits for each feature
         single_logits = [
             feature_net(input) for feature_net, input in zip(self.feature_nets, x.T)
         ]
-        # concatenate logits and add feature dropout
-        concat_logits = self.feature_dropout(torch.concat(single_logits, dim=1))
+        # concatenate logits of all features and add feature dropout
+        concat_logits = self.feature_dropout(torch.concat(single_logits, dim=-1))
         # also
         return torch.sum(concat_logits, dim=1) + self.bias, concat_logits
