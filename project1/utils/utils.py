@@ -180,7 +180,7 @@ class EarlyStopping:
             self.best_val_loss = val_loss
             # save current best model
             if self.best_model_path is not None:
-                torch.save(self.best_model.state_dict(), self.best_model_path)
+                torch.save(self.best_model, self.best_model_path)
         elif current_epoch > self.start:
             self.counter += 1  # stop training if no improvement in a long time
             if self.counter >= self.patience:
