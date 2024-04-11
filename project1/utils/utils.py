@@ -22,6 +22,8 @@ from typing import Tuple, List
 from PIL import Image
 import torchvision
 
+from icecream import ic
+
 
 # ==========================================================================
 # General Utilities
@@ -102,7 +104,7 @@ class PneumoniaDataset(Dataset):
                 Defaults to None.
         """
         self.images = images
-        self.labels = torch.from_numpy(labels).float()
+        self.labels = torch.tensor(labels, dtype = torch.long)
         self.transforms = transforms
 
     def __len__(self):
@@ -286,11 +288,13 @@ def train_and_validate_one_epoch(
                 y_pred.extend(
                     F.sigmoid(aggregated_logits.detach()).cpu().numpy().round()
                 )
-
             else:
                 logits = model(x.to(device))
-                y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round())
-
+                if logits.size(1) == 1:
+                    y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round().astype(int))
+                else:
+                    y_pred.extend(torch.argmax(F.softmax(logits.detach()).cpu(), dim = 1).numpy().round().astype(int))
+                
                 # calculate validation loss
                 loss = criterion(logits, y.to(device))
             val_loss += loss.item()
@@ -460,7 +464,12 @@ def test(
 
             else:
                 logits = model(x.to(device))
-                probs = F.sigmoid(logits.detach()).cpu().numpy()
+                if logits.size(1) == 1:
+                    # probabilities for the positive class
+                    probs = F.sigmoid(logits.detach().cpu()).numpy()
+                else:
+                    # probabilities for the positive class
+                    probs = F.softmax(logits.detach().cpu(), dim = 1)[:, 1].numpy()
                 model_probs.extend(probs)
 
                 y_pred.extend((probs.round()).astype(float))
