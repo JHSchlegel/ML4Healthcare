@@ -95,6 +95,8 @@ print(f"{names=}")
 
 
 #%%
+df_test = pd.DataFrame(data=X_test, columns=names_cleaned)
+
 y_pred = Lasso.predict(df_test)
 #%%
 f1 = f1_score(y_test, y_pred)
