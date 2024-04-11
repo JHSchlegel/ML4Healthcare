@@ -22,7 +22,6 @@ from typing import Tuple, List
 from PIL import Image
 import torchvision
 
-from icecream import ic
 
 
 # ==========================================================================
@@ -321,7 +320,7 @@ def train_and_validate(
     summary_writer: SummaryWriter = None,
     scheduler: torch.optim.lr_scheduler = None,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> Tuple[List[float], List[float], List[float], List[float], float]:
+) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Train loop for the model. Returns the train loss, validation loss, validation f1 scores and
         validation balanced accuracie scores over time.
 
@@ -349,7 +348,8 @@ def train_and_validate(
 
     Returns:
         Tuple[List[float], List[float], List[float], List[float], float]:
-            Returns the train loss, validation loss and validation f1 scores.
+            Returns the train loss, validation loss and validation f1 scores and
+            valdiation balanced accuracies over the epochs.
     """
 
     # initialize metrics
