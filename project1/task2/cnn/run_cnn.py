@@ -31,23 +31,16 @@ TRAIN_BATCH_SIZE = 16
 VAL_BATCH_SIZE = 128
 TEST_BATCH_SIZE = 128
 
-SEED = 42
-VALIDATION_SIZE = 0.2
-
-TRAIN_BATCH_SIZE = 32
-VAL_BATCH_SIZE = 128
-TEST_BATCH_SIZE = 128
-
 N_EPOCHS = 200
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 OPTIMIZER = torch.optim.Adam
 
-LEARNING_RATE = 3e-4
+LEARNING_RATE = 1e-5 # low learning rate to avoid changing pretrained weights too much
 SCHEDULER_STEP_SIZE = 10
 SCHEDULER_GAMMA = 0.75
 
-EARLY_STOPPING_START = 25
+EARLY_STOPPING_START = 100
 
 
 def main():
@@ -120,20 +113,26 @@ def main():
     # https://www.tensorflow.org/tutorials/structured_data/imbalanced_data#class_weights
     num_0 = np.sum(train_labels == 0)
     num_1 = np.sum(train_labels == 1)
-    weight = torch.tensor([num_0 / num_1]).float().to(DEVICE)
+    weight = torch.tensor(
+        [
+            (1/num_0) * (num_0 + num_1) / 2.0,
+            (1/num_1) * (num_0 + num_1) / 2.0
+            
+        ], dtype = torch.float32
+    ).to(DEVICE)
+    # create the model
+    set_all_seeds(SEED)
 
     # create the model
     model = CNN().to(DEVICE)
 
-    # transfer learn i.e. freeze the convolutional layers of the resnet 50 network
+    # we unfreeze all layers to make sure that also the convolutional layers are finetuned
+    # on our small pneumonia dataset
     for x in model.resnet.parameters():
-        x.requires_grad = False
-
-    for x in model.resnet.fc.parameters():
         x.requires_grad = True
 
     # instantiate loss function and optimizer
-    criterion = nn.BCEWithLogitsLoss(pos_weight=weight)
+    criterion = nn.CrossEntropyLoss(weight = weight)
 
     optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.StepLR(
@@ -147,10 +146,11 @@ def main():
 
     # instantiate early stopping class
     ES = EarlyStopping(
-        best_model_path="../models/cnn.pth",
+        best_model_path="../models/cnn_all_unfrozen.pth",
         start=EARLY_STOPPING_START,
         epsilon=0,
-        patience=10,
+        patience=20,
+        save_model_state_dict=True,
     )
 
     # train the model on the trainisng data and validate on the validation data
