@@ -98,6 +98,7 @@ def main():
     X_train = preprocessor.fit_transform(X_train)
     X_val = preprocessor.transform(X_val)
     X_test = preprocessor.transform(X_test)
+    
 
     # Create the dataset and dataloader
     train_dataset = HeartFailureDataset(X_train, y_train)
@@ -149,6 +150,7 @@ def main():
         best_model_path="../models/neural_additive_model.pth",
         start=EARLY_STOPPING_START,
         epsilon=1e-6,
+        save_model_state_dict=False
     )
 
     # train the model on the training data and validate on the validation data

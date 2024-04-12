@@ -20,9 +20,9 @@ class CNN(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=0.5),
             # return one output for binary classification with BCEWithLogitsLoss
-            nn.Linear(2048, 1),
+            nn.Linear(2048, 2),
         )
 
     def forward(self, x):
         # squeeze to make sure dimension is compatible with BCEWithLogitsLoss
-        return self.resnet(x).squeeze()
+        return self.resnet(x)

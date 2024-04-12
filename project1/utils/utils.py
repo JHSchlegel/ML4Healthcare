@@ -23,6 +23,7 @@ from PIL import Image
 import torchvision
 
 
+
 # ==========================================================================
 # General Utilities
 # ==========================================================================
@@ -102,7 +103,7 @@ class PneumoniaDataset(Dataset):
                 Defaults to None.
         """
         self.images = images
-        self.labels = torch.from_numpy(labels).float()
+        self.labels = torch.tensor(labels, dtype = torch.long)
         self.transforms = transforms
 
     def __len__(self):
@@ -129,6 +130,7 @@ class EarlyStopping:
         start: int = 50,
         patience: int = 20,
         epsilon: float = 1e-6,
+        save_model_state_dict: bool = False,
         device: torch.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         ),
@@ -146,6 +148,8 @@ class EarlyStopping:
             training process is stopped early. Defaults to 20.
             epsilon (float, optional): Tolerance of improvement to avoid stopping
                 solely because of numerical issues. Defaults to 1e-6.
+            save_model_state_dict (bool, optional): Whether to save the model state dict
+                or the whole model. Defaults to True.
             device (torch.device, optional): Device to run the model on.
                 Defaults to torch.device( "cuda" if torch.cuda.is_available() else "cpu" ).
         """
@@ -155,6 +159,7 @@ class EarlyStopping:
         self.patience = patience
         self.epsilon = epsilon
         self.best_model = nn.Identity
+        self.save_model_state_dict = save_model_state_dict
         self.best_val_loss = np.inf
         self.device = device
 
@@ -180,7 +185,10 @@ class EarlyStopping:
             self.best_val_loss = val_loss
             # save current best model
             if self.best_model_path is not None:
-                torch.save(self.best_model, self.best_model_path)
+                if self.save_model_state_dict:
+                    torch.save(self.best_model.state_dict(), self.best_model_path)
+                else:
+                    torch.save(self.best_model, self.best_model_path)
         elif current_epoch > self.start:
             self.counter += 1  # stop training if no improvement in a long time
             if self.counter >= self.patience:
@@ -286,11 +294,13 @@ def train_and_validate_one_epoch(
                 y_pred.extend(
                     F.sigmoid(aggregated_logits.detach()).cpu().numpy().round()
                 )
-
             else:
                 logits = model(x.to(device))
-                y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round())
-
+                if logits.size(1) == 1:
+                    y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round().astype(int))
+                else:
+                    y_pred.extend(torch.argmax(F.softmax(logits.detach(), dim=-1).cpu(), dim=1).numpy().round().astype(int))
+                
                 # calculate validation loss
                 loss = criterion(logits, y.to(device))
             val_loss += loss.item()
@@ -317,7 +327,7 @@ def train_and_validate(
     summary_writer: SummaryWriter = None,
     scheduler: torch.optim.lr_scheduler = None,
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> Tuple[List[float], List[float], List[float], List[float], float]:
+) -> Tuple[List[float], List[float], List[float], List[float]]:
     """Train loop for the model. Returns the train loss, validation loss, validation f1 scores and
         validation balanced accuracie scores over time.
 
@@ -345,7 +355,8 @@ def train_and_validate(
 
     Returns:
         Tuple[List[float], List[float], List[float], List[float], float]:
-            Returns the train loss, validation loss and validation f1 scores.
+            Returns the train loss, validation loss and validation f1 scores and
+            valdiation balanced accuracies over the epochs.
     """
 
     # initialize metrics
@@ -460,7 +471,12 @@ def test(
 
             else:
                 logits = model(x.to(device))
-                probs = F.sigmoid(logits.detach()).cpu().numpy()
+                if logits.size(1) == 1:
+                    # probabilities for the positive class
+                    probs = F.sigmoid(logits.detach().cpu()).numpy()
+                else:
+                    # probabilities for the positive class
+                    probs = F.softmax(logits.detach().cpu(), dim = 1)[:, 1].numpy()
                 model_probs.extend(probs)
 
                 y_pred.extend((probs.round()).astype(float))
