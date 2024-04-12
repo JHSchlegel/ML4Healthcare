@@ -5,7 +5,6 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
-from cnn import CNN
 
 # confusion matrix:
 from sklearn.metrics import confusion_matrix
@@ -14,6 +13,8 @@ from sklearn.metrics import confusion_matrix
 import sys
 
 sys.path.append("../..")
+sys.path.append("..")
+from  cnn.cnn import CNN
 from utils.utils import (
     get_pneumonia_images,
     PneumoniaDataset,
@@ -40,8 +41,8 @@ LEARNING_RATE = 1e-5 # low learning rate to avoid changing pretrained weights to
 SCHEDULER_STEP_SIZE = 10
 SCHEDULER_GAMMA = 0.75
 
-EARLY_STOPPING_START = 100
-
+EARLY_STOPPING_START = 200 # no early stopping since otherwise first epoch would be saved
+# due to permuted labels
 
 def main():
     train_images, train_labels = get_pneumonia_images("../data/chest_xray/train")
@@ -65,6 +66,12 @@ def main():
         random_state=SEED,
         stratify=train_labels_concat,
     )
+    
+    # randomize the labels of the training data only using np.permutation
+    # see https://github.com/adebayoj/sanity_checks_saliency/blob/master/src/train_cnn_models.py
+    np.random.seed(SEED)
+    train_labels_permuted = np.random.permutation(train_labels)
+
 
     # Note that the transformations below are the same as the ones from the following
     # kaggle post:
@@ -90,7 +97,7 @@ def main():
 
     # for more info about our custom PneunomiaDataset class see the utils file
     train_set = PneumoniaDataset(
-        train_images, train_labels, transforms=train_transforms
+        train_images, train_labels_permuted, transforms=train_transforms
     )
     val_set = PneumoniaDataset(val_images, val_labels, transforms=val_transforms)
     test_set = PneumoniaDataset(test_images, test_labels, transforms=test_transforms)
@@ -105,12 +112,7 @@ def main():
     test_loader = DataLoader(
         test_set, batch_size=TEST_BATCH_SIZE, shuffle=False, pin_memory=True
     )
-
-    # set all seeds for reproducibility
-    set_all_seeds(SEED)
-
-    # Tensorflow tutorial on how to deal with imbalanced data in DeepLearnning
-    # https://www.tensorflow.org/tutorials/structured_data/imbalanced_data#class_weights
+    
     num_0 = np.sum(train_labels == 0)
     num_1 = np.sum(train_labels == 1)
     weight = torch.tensor(
@@ -122,27 +124,25 @@ def main():
     ).to(DEVICE)
     # create the model
     set_all_seeds(SEED)
-
-    # create the model
     model = CNN().to(DEVICE)
 
-    # we unfreeze all layers to make sure that also the convolutional layers are finetuned
+    # we unfreeze all layers to make sure that also the convolutional layers are trained
     # on our small pneumonia dataset
     for x in model.resnet.parameters():
         x.requires_grad = True
 
     # instantiate loss function and optimizer
-    criterion = nn.CrossEntropyLoss(weight = weight)
+    criterion = nn.CrossEntropyLoss(weight = weight)#BCEWithLogitsLoss(pos_weight=weight)
 
-    optimizer = OPTIMIZER(model.parameters(), lr=LEARNING_RATE)
+    optimizer = OPTIMIZER(model.parameters(), lr=1e-5)
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=SCHEDULER_STEP_SIZE, gamma=SCHEDULER_GAMMA
+        optimizer, step_size=10, gamma=0.75
     )
 
     # visualize the progress in the tensorboard by typing
     # `tensorboard --logdir logs` in the terminal and then navigate
     # to the created process in the browser
-    writer = SummaryWriter("logs/cnn_experiment")
+    writer = SummaryWriter("logs/cnn_permuted_experiment")
 
     # instantiate early stopping class
     ES = EarlyStopping(
@@ -152,10 +152,8 @@ def main():
         patience=20,
         save_model_state_dict=True,
     )
-
-    # train the model on the trainisng data and validate on the validation data
-    # the best model is saved in the best_model_path using the ES object from above
-    train_and_validate(
+    
+    _, val_loss, _, _ = train_and_validate(
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -166,13 +164,12 @@ def main():
         summary_writer=writer,
         device=DEVICE,
     )
-
+    
     test_loss, test_f1_score, test_balanced_accuracy, model_probs, y_true = test(
         model, test_loader, criterion, device=DEVICE
     )
 
     print(confusion_matrix(y_true, model_probs.round()))
-
-
+    
 if __name__ == "__main__":
     main()
