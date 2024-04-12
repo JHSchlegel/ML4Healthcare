@@ -9,42 +9,6 @@ cd project1
 pipreqs . --force
 ```
 
-## TODO
-
-### Task1
-|What|When|Who|
-|-----|----|----|
-|Q1: EDA||Jan|
-|Q2: Logistic Lasso|||
-|Q3: MLP||Paul|
-|Q4: NAM||Jan|
-
-### Task2
-|What|When|Who|
-|-----|----|----|
-|Q1: EDA||Jan|
-|Q2: CNN||Gianfranco|
-|Q3: Integrated Gradients||Gianfranco|
-|Q4: Grad-CAM||Paul|
-|Q5: Data Randomisation Test|||
-
-### Task3
-#### Task3 - Part1
-|What|When|Who|
-|-----|----|----|
-|Q1: Consistency between methods and patterns|||
-|Q2: Convincing the doctor|||
-|Q3: Intuition features|||
-|Q4: Which models would you choose|||
-
-#### Task3 - Part2
-|What|When|Who|
-|-----|----|----|
-|Q1: Consistency between methods and patterns|||
-|Q2: Convincing the doctor|||
-|Q3: Intuition features|||
-|Q4: Which models would you choose|||
-
 
 ### Report
 
@@ -58,7 +22,7 @@ pipreqs . --force
 ## Contributors
 
 - Paul Schlossmacher (23-941-636)
-- Gianfranco Basile (Legi here)
+- Gianfranco Basile (23-955-545)
 - Jan Schlegel (19-747-096)
 
 ## Setup
