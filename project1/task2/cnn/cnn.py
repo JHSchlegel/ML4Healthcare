@@ -7,7 +7,7 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
         # use pretrained resnet 50
-        self.resnet = models.resnet50(pretrained=False)
+        self.resnet = models.resnet50(pretrained=True)
         # replace fully connected layer
         self.resnet.fc = nn.Sequential(
             nn.LazyLinear(2048),
