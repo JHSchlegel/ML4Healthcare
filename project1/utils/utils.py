@@ -296,7 +296,8 @@ def train_and_validate_one_epoch(
                 )
             else:
                 logits = model(x.to(device))
-                if logits.size(1) == 1:
+                # if model only returns logits for positive class
+                if logits.dim() == 1:
                     y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round().astype(int))
                 else:
                     y_pred.extend(torch.argmax(F.softmax(logits.detach(), dim=-1).cpu(), dim=1).numpy().round().astype(int))
@@ -471,7 +472,8 @@ def test(
 
             else:
                 logits = model(x.to(device))
-                if logits.size(1) == 1:
+                # if model only returns logits for positive class
+                if logits.dim() == 1:
                     # probabilities for the positive class
                     probs = F.sigmoid(logits.detach().cpu()).numpy()
                 else:
