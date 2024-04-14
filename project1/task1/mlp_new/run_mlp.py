@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from mlp import MLP
-from icecream import ic
+#from icecream import ic
 import os
 from sklearn.metrics import confusion_matrix
 
@@ -64,6 +64,9 @@ EARLY_STOPPING_START = 60
 
 def main():
     ## Load the training and validation data
+    
+    
+    
     train_df = pd.read_csv("../data/heart_failure/train_val_split.csv").pipe(
         clean_columns
     )
@@ -154,6 +157,7 @@ def main():
         scheduler=scheduler,
         summary_writer=writer,
         device=DEVICE,
+        use_penalized_BCE=False
         #forward_returns_tuple=True
         #forward_returns_tuple=False
     )
