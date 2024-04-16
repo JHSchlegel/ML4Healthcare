@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.nn.parameter import Parameter
 from typing import List, Tuple
 
 
@@ -8,7 +7,6 @@ from typing import List, Tuple
 import sys
 
 sys.path.append("..")
-#from utils.utils import ExULayer, ReLUn
 
 
 class MLP(nn.Module):
@@ -17,8 +15,6 @@ class MLP(nn.Module):
         in_size: int,
         out_size: int = 2,
         hidden_profile: List[int] = [1024],
-        #use_exu: bool = True,
-        #use_relu_n: bool = True,
         dropout: float = 0.0,
     ):
         super(MLP, self).__init__()
@@ -43,9 +39,8 @@ class MLP(nn.Module):
         self.nn = nn.Sequential(*self.layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-    #    return self.nn(x.unsqueeze(1))
         x = self.nn(x)
-        return x.squeeze()  # Squeeze the output here to ensure correct shape
+        return x.squeeze()  # Squeeze the output here to ensure correct shape for BCEWithLogitsLoss
     
 
 
