@@ -19,10 +19,9 @@ class CNN(nn.Module):
             nn.Linear(4096, 2048),
             nn.ReLU(),
             nn.Dropout(p=0.5),
-            # return one output for binary classification with BCEWithLogitsLoss
+            # return two outputs for binary classification using CrossEntropyLoss 
             nn.Linear(2048, 2),
         )
 
     def forward(self, x):
-        # squeeze to make sure dimension is compatible with BCEWithLogitsLoss
         return self.resnet(x)
