@@ -7,7 +7,6 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from mlp import MLP
-#from icecream import ic
 import os
 from sklearn.metrics import confusion_matrix
 
@@ -22,8 +21,6 @@ from utils.utils import (
     train_and_validate,
     test,
     EarlyStopping,
-    get_n_units,
-    penalized_binary_cross_entropy,
 )
 
 
@@ -41,10 +38,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 N_EPOCHS = 300
 
 HIDDEN_PROFILE = [1024]
-#USE_EXU = False
-#USE_RELU_N = False
-#WITHIN_FEATURE_DROPOUT = 0.4
-#FEATURE_DROPOUT = 0.0
+
 
 
 LEARNING_RATE = 0.003
@@ -53,10 +47,7 @@ SCHEDULER_STEP_SIZE = 10
 SCHEDULER_GAMMA = 0.9
 
 OPTIMIZER = torch.optim.Adam
-CRITERION = penalized_binary_cross_entropy
-
-#OUTPUT_REGULARIZATION = 0.0058
-#L2_REGULARIZATION = 3.87e-5
+CRITERION = nn.BCEWithLogitsLoss()
 
 EARLY_STOPPING_START = 60
 
@@ -120,7 +111,7 @@ def main():
         test_dataset, batch_size=128, shuffle=False, pin_memory=True
     )
 
-    
+    set_all_seeds(SEED)
     model = MLP(
         in_size=25,
         out_size=1,
@@ -158,21 +149,15 @@ def main():
         summary_writer=writer,
         device=DEVICE,
         use_penalized_BCE=False
-        #forward_returns_tuple=True
-        #forward_returns_tuple=False
     )
 
     set_all_seeds(SEED)
 
-    #test(
     test_loss, test_f1_score, balanced_accuracy, model_probs, y_true = test(
         model=model,
         test_loader=test_loader,
         criterion=criterion,
         device=DEVICE,
-        #forward_returns_tuple=True,
-        #forward_returns_tuple=False,
-        #threshold=best_threshold,
     )
     
     # confusion matrix:
