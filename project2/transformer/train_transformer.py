@@ -29,7 +29,7 @@ from transformer_utils import (
 
 from transformer import Transformer
 
-with open("config.yaml", "r") as file:
+with open("transformer_config.yaml", "r") as file:
     config = yaml.safe_load(file)
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
