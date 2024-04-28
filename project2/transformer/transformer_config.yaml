@@ -1,3 +1,5 @@
+general:
+  seed: 42
 paths:
   ptb_train: ../data/ptbdb_train.csv
   ptb_test: ../data/ptbdb_test.csv
@@ -6,7 +8,6 @@ paths:
 
 preprocessing:
   use_smote: True
-  seed: 42
   validation_size: 0.2
 
 dataloader:
@@ -23,7 +24,6 @@ scheduler:
   patience: 5
 
 transformer:
-  seed: 42
   num_epochs: 100
   num_classes: 2
   input_size: 1
