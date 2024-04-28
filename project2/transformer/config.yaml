@@ -15,7 +15,7 @@ dataloader:
   test_batch_size: 256
 
 adamw:
-  weight_decay: 0.0001
+  weight_decay: 0.0001 
   learning_rate: 0.0003
 
 scheduler:
@@ -29,7 +29,7 @@ transformer:
   input_size: 1
   model_size: 64
   num_heads: 8
-  num_encoder_layers: 3
+  num_encoder_layers: 5
   dim_feed_forward: 128
   dropout: 0.0
   transformer_activation: gelu
