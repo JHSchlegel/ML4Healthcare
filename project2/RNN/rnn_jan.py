@@ -214,7 +214,7 @@ def test(model: nn.Module,
             logits = model(inputs.to(device))
             #logits = logits.detach().cpu().numpy().round().astype(int)
             #probs = F.sigmoid(logits)
-            y_pred.extend(F.sigmoid(logits.detach()).cpu().numpy().round().astype(int))
+            y_pred.extend(logits.detach().cpu().numpy().round().astype(int))
             #model_probs.extend(probs)
             #print(probs)
             #print(y_pred)
@@ -238,7 +238,7 @@ model.load_state_dict(torch.load('temp_new.pth'))
 #%%
 model.eval()
 #%%
-loss_function = nn.BCEWithLogitsLoss()
+loss_function = nn.BCELoss()
 optim = torch.optim.Adam(model.parameters(), lr=LR)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
