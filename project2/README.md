@@ -8,6 +8,9 @@
 |Part 1|CNN|Paul|
 |Part 1|Attention and Transformers|Jan|
 
+
+|Part|Task|Name|
+|----|--------|------
 |Part 2|Supervised Model for Transfer|Ciccio|
 |Part 2|Representation Learning Model|Gianni|
 |Part 2|Visualising Learned Representations|Ciccio|
