@@ -1,8 +1,8 @@
 general:
   seed: 42
 paths:
-  ptb_train: ../data/ptbdb_train.csv
-  ptb_test: ../data/ptbdb_test.csv
+  ptb_train: ../../data/ptbdb_train.csv
+  ptb_test: ../../data/ptbdb_test.csv
   transformer_model: ../weights/transformer_model.pth
   summary_writer: logs/transformer
 
