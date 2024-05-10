@@ -67,11 +67,10 @@ def main():
     #!!! copied from https://www.kaggle.com/code/megazotya/ecg-transformer/notebook
     # We observed that oversampling the minority class tended to improve
     # the model's performance by a tiny bit.
-    if config["preprocessing"]["use_smote"]:
-        sm = SMOTE(random_state=config["general"]["seed"])
-        X_train, y_train = sm.fit_resample(X_train, y_train)
-        ic(X_train.shape, y_train.shape)
-        ic(np.unique(y_train, return_counts=True))
+    sm = SMOTE(random_state=config["general"]["seed"])
+    X_train, y_train = sm.fit_resample(X_train, y_train)
+    ic(X_train.shape, y_train.shape)
+    ic(np.unique(y_train, return_counts=True))
 
     train_loader = DataLoader(
         PTB_Dataset(X_train, y_train),
