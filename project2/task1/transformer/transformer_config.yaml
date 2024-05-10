@@ -7,7 +7,6 @@ paths:
   summary_writer: logs/transformer
 
 preprocessing:
-  use_smote: True
   validation_size: 0.2
 
 dataloader:
@@ -33,7 +32,7 @@ transformer:
   dim_feed_forward: 128
   dropout: 0.0
   transformer_activation: gelu
-  use_padding_mask: True
+  use_padding_mask: False
 
 early_stopping:
   start: 20
