@@ -1,0 +1,5 @@
+paths:
+  mitbih_train: ../../data/mitbih_train.csv
+  mitbih_test: ../../data/mithbih_test.csv
+  transformer_model: ../weights/representation_learning.pth
+  summary_writer: logs/representation_learning
