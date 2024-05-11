@@ -1,5 +1,38 @@
+general:
+  seed: 42
+
 paths:
   mitbih_train: ../../data/mitbih_train.csv
   mitbih_test: ../../data/mithbih_test.csv
+  ptb_train: ../../data/ptbdb_train.csv
+  ptb_test: ../../data/ptbdb_test.csv
   transformer_model: ../weights/representation_learning.pth
   summary_writer: logs/representation_learning
+
+
+dataloader:
+  train_batch_size: 64
+  augmented_train_batch_size: 128
+  val_batch_size: 256
+  test_batch_size: 256
+
+
+
+adamw:
+  weight_decay: 0.0001 
+  learning_rate: 0.0003
+
+
+encoder:
+  latent_dim: 128
+
+contrastive_model:
+  projection_head: 64
+
+scheduler:
+  factor: 0.5
+  patience: 5
+
+early_stopping:
+  start: 20
+  patience: 10
