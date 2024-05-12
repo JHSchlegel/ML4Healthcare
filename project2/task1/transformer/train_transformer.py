@@ -48,12 +48,12 @@ def main():
     X_train_full = train_df.iloc[:, :-1].to_numpy()
     y_train_full = train_df.iloc[:, -1].to_numpy()
 
-    # 0-pad sequences to uniform, 190, length:
     X_test = test_df.iloc[:, :-1].to_numpy()
     y_test = test_df.iloc[:, -1].to_numpy()
 
-    X_train_full = np.c_[X_train_full, np.zeros((X_train_full.shape[0], 3))]
-    X_test = np.c_[X_test, np.zeros((X_test.shape[0], 3))]
+    ## 0-pad sequences to uniform, 190, length:
+    # X_train_full = np.c_[X_train_full, np.zeros((X_train_full.shape[0], 3))]
+    # X_test = np.c_[X_test, np.zeros((X_test.shape[0], 3))]
 
     # split into train and validation set:
     X_train, X_val, y_train, y_val = train_test_split(
