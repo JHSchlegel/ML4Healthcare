@@ -48,12 +48,12 @@ def main():
     X_train_full = train_df.iloc[:, :-1].to_numpy()
     y_train_full = train_df.iloc[:, -1].to_numpy()
 
-    # 0-pad sequences to uniform, 190, length:
     X_test = test_df.iloc[:, :-1].to_numpy()
     y_test = test_df.iloc[:, -1].to_numpy()
 
-    X_train_full = np.c_[X_train_full, np.zeros((X_train_full.shape[0], 3))]
-    X_test = np.c_[X_test, np.zeros((X_test.shape[0], 3))]
+    ## 0-pad sequences to uniform, 190, length:
+    # X_train_full = np.c_[X_train_full, np.zeros((X_train_full.shape[0], 3))]
+    # X_test = np.c_[X_test, np.zeros((X_test.shape[0], 3))]
 
     # split into train and validation set:
     X_train, X_val, y_train, y_val = train_test_split(
@@ -67,11 +67,10 @@ def main():
     #!!! copied from https://www.kaggle.com/code/megazotya/ecg-transformer/notebook
     # We observed that oversampling the minority class tended to improve
     # the model's performance by a tiny bit.
-    if config["preprocessing"]["use_smote"]:
-        sm = SMOTE(random_state=config["general"]["seed"])
-        X_train, y_train = sm.fit_resample(X_train, y_train)
-        ic(X_train.shape, y_train.shape)
-        ic(np.unique(y_train, return_counts=True))
+    sm = SMOTE(random_state=config["general"]["seed"])
+    X_train, y_train = sm.fit_resample(X_train, y_train)
+    ic(X_train.shape, y_train.shape)
+    ic(np.unique(y_train, return_counts=True))
 
     train_loader = DataLoader(
         PTB_Dataset(X_train, y_train),
