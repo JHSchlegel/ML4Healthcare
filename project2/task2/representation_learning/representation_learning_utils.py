@@ -56,12 +56,13 @@ class MITBIH_Dataset(Dataset):
 #!!! https://www.kaggle.com/code/coni57/model-from-arxiv-1805-00794
 class MITBIH_Augment_Dataset(Dataset):
     """
-    Custom dataset for the MITBIH dataset that returns the input sequence and its reverse.
+    Custom dataset for the MITBIH dataset that returns the input sequence, a positive sample and negative samples.
     """
 
-    def __init__(self, X: torch.tensor):
+    def __init__(self, X: torch.Tensor, num_neg_samples: int = 4):
         self.X = torch.tensor(X, dtype=torch.float32)
         self.len = len(self.X)
+        self.num_neg_samples = num_neg_samples
 
     def __len__(self):
         return len(self.X)
@@ -73,18 +74,18 @@ class MITBIH_Augment_Dataset(Dataset):
         # positive sample:
         x_pos = self._augment(x)
 
-        # create and augment negative sample:
+        # generate negative samples:
         negative_idx = idx
-        while negative_idx == idx:
-            negative_idx = np.random.choice(self.len)
+        while np.any(negative_idx == idx):
+            negative_idx = np.random.choice(self.len, self.num_neg_samples)
+
         x_neg = self.X[negative_idx]
-        x_neg = self._augment(x_neg)
-
-        x = self._augment(x)
-
+        # perform augmentations to make the negative samples more diverse
+        for i in range(self.num_neg_samples):
+            x_neg[i] = self._create_negative_sample(x_neg[i])
         return x, x_pos, x_neg
 
-    def _augment(self, x: torch.tensor) -> torch.tensor:
+    def _augment(self, x: torch.Tensor) -> torch.Tensor:
         rand = random.random()
         if rand < 1 / 3:
             return self._add_noise(x)
@@ -92,21 +93,63 @@ class MITBIH_Augment_Dataset(Dataset):
             return self._amplify(x)
         else:
             return self._stretch(x)
+        # no rolling since it did not yield the desired results; probably due to the
+        # zero padding at the end of the sequence
 
-    def _roll(self, x: torch.tensor) -> torch.tensor:
+    # def _augment(self, x: torch.Tensor) -> torch.Tensor:
+    #     rand1 = random.random()
+    #     if rand1 < 1 / 3:
+    #         x = self._add_noise(x)
+    #     elif rand1 < 2 / 3:
+    #         x = self._amplify(x)
+    #     else:
+    #         x = self._stretch(x)
+
+    #     rand2 = random.random()
+    #     if rand2 < 1 / 3:
+    #         return self._reverse(x)
+    #     elif rand2 < 2 / 3:
+    #         return self._permute(x)
+    #     else:
+    #         return self._roll(x)
+
+    def _create_negative_sample(self, x: torch.Tensor) -> torch.Tensor:
+        # add noise:
+        x_neg = self._augment(x)
+        return x_neg
+        # rand = random.random()
+        # if rand < 1 / 3:
+        #     # reverse time series:
+        #     return self._reverse(x_neg)
+        # elif rand < 2 / 3:
+        #     # randomly permute time series:
+        #     return self._permute(x_neg)
+
+        # else:
+        #     # rolling shift:
+        #     return self._roll(x_neg)
+        # return x_neg
+
+    def _reverse(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.flip(x, dims=[0])
+
+    def _permute(self, x: torch.Tensor) -> torch.Tensor:
+        return x[torch.randperm(x.shape[0])]
+
+    def _roll(self, x: torch.Tensor) -> torch.Tensor:
         shift = random.randint(-15, 15)
         return torch.roll(x, shifts=shift, dims=0)
 
-    def _add_noise(self, x: torch.tensor, noise: float = 0.05) -> torch.tensor:
+    def _add_noise(self, x: torch.Tensor, noise: float = 0.05) -> torch.Tensor:
         return torch.clip(x + torch.randn_like(x) * noise, 0, 1)
 
-    def _amplify(self, x: torch.tensor, factor: float = 0.1) -> torch.tensor:
+    def _amplify(self, x: torch.Tensor, factor: float = 0.1) -> torch.Tensor:
         alpha = torch.rand_like(x) - 0.5
         factor = -alpha * x + (1 + alpha)
         return torch.clip(x * factor, 0, 1)
 
     # see: https://machinelearningmastery.com/resample-interpolate-time-series-data-python/
-    def _stretch(self, x: torch.tensor) -> torch.tensor:
+    def _stretch(self, x: torch.Tensor) -> torch.Tensor:
         orig_len = x.shape[0]
         size = int(x.shape[0] * (1 + (random.random() - 0.5) / 4))
         # resize the tensor x:
@@ -221,11 +264,11 @@ class EarlyStopping:
 # =========================================================================== #
 #                    Model Training and Evaluation                            #
 # =========================================================================== #
-def train_one_epoch(
+def train_encoder_one_epoch(
     model: nn.Module,
     optimizer: optim.Optimizer,
     criterion: nn.Module,
-    train_loader: DataLoader,
+    train_augment_loader: DataLoader,
     device: torch.device,
 ) -> tuple[float, float, float, float]:
     """Train the model for one epoch
@@ -245,32 +288,38 @@ def train_one_epoch(
     model.train()
 
     total_loss = 0.0
-    y_preds = []
-    y_true = []
-    for seq, label in train_loader:
-        seq, label = seq.to(device), label.to(device)
+    for seq, seq_aug, seq_neg in train_augment_loader:
+        seq, seq_aug, seq_neg = seq.to(device), seq_aug.to(device), seq_neg.to(device)
         optimizer.zero_grad()
 
         output = model(seq)
-        loss = criterion(output, label)
+        output_aug = model(seq_aug)
+
+        if seq_neg.dim() == 3:
+            output_neg = torch.zeros(
+                seq_neg.shape[0], seq_neg.shape[1], output.shape[1]
+            ).to(device)
+            for i in range(seq_neg.shape[1]):
+                output_neg[:, i, :] = model(seq_neg[:, i, :])
+        else:
+            output_neg = model(seq_neg)
+        loss = criterion(output, output_aug, output_neg)
         loss.backward()
 
         optimizer.step()
 
         total_loss += loss.item()
-        y_true.extend(label.cpu().numpy())
-        y_preds.extend(F.softmax(output, dim=1).argmax(dim=1).cpu().numpy())
 
     # calculate metrics
-    train_loss = total_loss / len(train_loader.dataset)
-    train_acc = accuracy_score(y_true, y_preds)
-    train_balanced_acc = balanced_accuracy_score(y_true, y_preds)
-    train_f1_score = f1_score(y_true, y_preds)
-    return train_loss, train_acc, train_balanced_acc, train_f1_score
+    train_loss = total_loss / len(train_augment_loader.dataset)
+    return train_loss
 
 
-def validate_one_epoch(
-    model: nn.Module, criterion: nn.Module, val_loader: DataLoader, device: torch.device
+def validate_encoder_one_epoch(
+    model: nn.Module,
+    criterion: nn.Module,
+    val_augment_loader: DataLoader,
+    device: torch.device,
 ) -> tuple[float, float, float, float]:
     """Validate the model for one epoch
 
@@ -287,37 +336,46 @@ def validate_one_epoch(
 
     model.eval()
 
-    total_loss = 0
+    total_loss = 0.0
     y_preds = []
     y_true = []
     with torch.no_grad():
-        for seq, label in val_loader:
-            seq, label = seq.to(device), label.to(device)
+        for seq, seq_aug, seq_neg in val_augment_loader:
+            seq, seq_aug, seq_neg = (
+                seq.to(device),
+                seq_aug.to(device),
+                seq_neg.to(device),
+            )
 
             output = model(seq)
+            output_aug = model(seq_aug)
+            if seq_neg.dim() == 3:
+                output_neg = torch.zeros(
+                    seq_neg.shape[0], seq_neg.shape[1], output.shape[1]
+                ).to(device)
+                for i in range(seq_neg.shape[1]):
+                    output_neg[:, i, :] = model(seq_neg[:, i, :])
+            else:
+                output_neg = model(seq_neg)
+            loss = criterion(output, output_aug, output_neg)
 
-            loss = criterion(output, label)
             total_loss += loss.item()
-
-            y_true.extend(label.cpu().numpy())
-            y_preds.extend(F.softmax(output, dim=1).argmax(dim=1).cpu().numpy())
-
     # calculate metrics
-    val_loss = total_loss / len(val_loader.dataset)
-    val_acc = accuracy_score(y_true, y_preds)
-    val_balanced_acc = balanced_accuracy_score(y_true, y_preds)
-    val_f1_score = f1_score(y_true, y_preds)
-    return val_loss, val_acc, val_balanced_acc, val_f1_score
+    val_loss = total_loss / len(val_augment_loader.dataset)
+    # val_acc = accuracy_score(y_true, y_preds)
+    # val_balanced_acc = balanced_accuracy_score(y_true, y_preds)
+    # val_f1_score = f1_score(y_true, y_preds)
+    return val_loss
 
 
-def train_and_validate(
+def train_and_validate_encoder(
     model: nn.Module,
     optimizer: optim.Optimizer,
     scheduler: optim.lr_scheduler,
     criterion: nn.Module,
-    train_loader: DataLoader,
-    val_loader: DataLoader,
-    best_model_path: str = "weights/transformer_pe.pth",
+    train_augment_loader: DataLoader,
+    val_augment_loader: DataLoader,
+    best_model_path: str = "weights/representation_learning.pth",
     device: torch.device = torch.device(
         "cuda:0" if torch.cuda.is_available() else "cpu"
     ),
@@ -329,21 +387,16 @@ def train_and_validate(
     with trange(num_epochs) as t:
         for epoch in t:
             dct = {}
-            train_loss, train_acc, train_balanced_acc, train_f1_score = train_one_epoch(
-                model, optimizer, criterion, train_loader, device
+            train_loss = train_encoder_one_epoch(
+                model, optimizer, criterion, train_augment_loader, device
             )
-            val_loss, val_acc, val_balanced_acc, val_f1_score = validate_one_epoch(
-                model, criterion, val_loader, device
+            val_loss = validate_encoder_one_epoch(
+                model, criterion, val_augment_loader, device
             )
 
             # update progress bar
-            t.set_description(f"Training Transformer")
-            t.set_postfix(
-                train_loss=train_loss,
-                val_loss=val_loss,
-                train_balanced_acc=train_balanced_acc,
-                val_balanced_acc=val_balanced_acc,
-            )
+            t.set_description(f"Training ContrastiveNet")
+            t.set_postfix(train_loss=train_loss, val_loss=val_loss)
 
             # reduce learning rate
             if scheduler is not None:
@@ -353,18 +406,8 @@ def train_and_validate(
             if summary_writer is not None:
                 summary_writer.add_scalar("Loss train", train_loss, epoch)
                 summary_writer.add_scalar("Loss val", val_loss, epoch)
-                summary_writer.add_scalar("Accuracy train", train_acc, epoch)
-                summary_writer.add_scalar("Accuracy val", val_acc, epoch)
-                summary_writer.add_scalar(
-                    "Balanced accuracy train", train_balanced_acc, epoch
-                )
-                summary_writer.add_scalar(
-                    "Balanced accuracy val", val_balanced_acc, epoch
-                )
-                summary_writer.add_scalar("F1 score train", train_f1_score, epoch)
-                summary_writer.add_scalar("F1 score val", val_f1_score, epoch)
 
-            if ES.early_stop(model, val_balanced_acc, epoch):
+            if ES.early_stop(model, val_loss, epoch):
                 break
     ES.save_best_model(best_model_path)
     return model
