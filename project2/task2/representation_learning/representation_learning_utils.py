@@ -151,7 +151,7 @@ class MITBIH_Augment_Dataset(Dataset):
     # see: https://machinelearningmastery.com/resample-interpolate-time-series-data-python/
     def _stretch(self, x: torch.Tensor) -> torch.Tensor:
         orig_len = x.shape[0]
-        size = int(x.shape[0] * (1 + (random.random() - 0.5) / 4))
+        size = int(x.shape[0] * (1 + (random.random() - 0.5) / 2))
         # resize the tensor x:
         x_interpolated = (
             F.interpolate(
