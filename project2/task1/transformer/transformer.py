@@ -95,23 +95,6 @@ class TransformerEncoderLayerWithWeights(nn.TransformerEncoderLayer):
         Shape:
             see the docs in :class:`~torch.nn.Transformer`.
         """
-        # src_key_padding_mask = F._canonical_mask(
-        #     mask=src_key_padding_mask,
-        #     mask_name="src_key_padding_mask",
-        #     other_type=F._none_or_dtype(src_mask),
-        #     other_name="src_mask",
-        #     target_type=src.dtype,
-        # )
-
-        # src_mask = F._canonical_mask(
-        #     mask=src_mask,
-        #     mask_name="src_mask",
-        #     other_type=None,
-        #     other_name="",
-        #     target_type=src.dtype,
-        #     check_other=False,
-        # )
-
         src_key_padding_mask = F._canonical_mask(
             mask=src_key_padding_mask,
             mask_name="src_key_padding_mask",

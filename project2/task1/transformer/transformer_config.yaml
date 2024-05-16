@@ -31,9 +31,9 @@ transformer:
   num_heads: 8
   num_encoder_layers: 5
   dim_feed_forward: 128
-  dropout: 0.2
+  dropout: 0.0
   transformer_activation: gelu
-  use_padding_mask: False
+  use_padding_mask: True
 
 early_stopping:
   start: 20
