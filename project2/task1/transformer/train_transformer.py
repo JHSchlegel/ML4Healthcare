@@ -1,4 +1,6 @@
 # Run this script to train the transformer model
+# In case you get the error that torch.backends.mha was not found, run the following command:
+# pip install --upgrade torch
 
 # =========================================================================== #
 #                              Packages and Presets                           #
