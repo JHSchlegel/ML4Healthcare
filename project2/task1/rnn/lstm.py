@@ -38,16 +38,18 @@ output_dim = 1
 num_epochs = 200
 LR = 3e-4
 
+model_save_path = "../weights/lstm_bidirectional.pth"
+
 
 class LSTM(nn.Module):
     def __init__(
-        self, input_dim, hidden_dim, layer_dim, target_size, bidirectional=False
+        self, input_dim, hidden_dim, layer_dim, output_dim, bidirectional=False
     ):
         super().__init__()
         self.input_dim = input_dim  # Size of the imput
         self.hidden_dim = hidden_dim  # Number ho hidden size
         self.layer_dim = layer_dim  # Number of hidden layer
-        self.target_size = target_size  # Number of size of the output
+        self.target_size = output_dim  # Number of size of the output
         self.lstm = nn.LSTM(
             input_size=input_dim,
             hidden_size=hidden_dim,
@@ -85,9 +87,6 @@ ptbdb_test = pd.read_csv(path_test, header=None)
 
 x_train = ptbdb_train.iloc[:, :-1].values
 y_train = ptbdb_train.iloc[:, -1].values
-
-sm = SMOTE(random_state=42)
-x_train, y_train = sm.fit_resample(x_train, y_train)
 
 
 # %%
@@ -152,7 +151,7 @@ def train_and_validate(
 
         if bal_acc > best_bal_acc:
             best_bal_acc = bal_acc
-            torch.save(model.state_dict(), r"lstm_unidirectional.pth")
+            torch.save(model.state_dict(), model_save_path)
         # print(y_pred[0:60])
         print(
             f"Epoch {epoch+1}/{n_epochs}, Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}, F1 Score: {f1:.4f}, Balanced Accuracy: {bal_acc:.4f},"
@@ -161,7 +160,7 @@ def train_and_validate(
 
 # %%
 
-model = LSTM(input_dim, hidden_dim, layer_dim, output_dim, bidirectional=False).to(
+model = LSTM(input_dim, hidden_dim, layer_dim, output_dim, bidirectional=True).to(
     DEVICE
 )
 # model.load_state_dict(torch.load("best_model_new.pth"))
@@ -171,6 +170,9 @@ model = LSTM(input_dim, hidden_dim, layer_dim, output_dim, bidirectional=False).
 x_train, x_val, y_train, y_val = train_test_split(
     x_train, y_train, test_size=0.2, random_state=42
 )
+
+sm = SMOTE(random_state=42)
+x_train, y_train = sm.fit_resample(x_train, y_train)
 
 
 x_test = ptbdb_test.iloc[:, :-1].values
@@ -250,11 +252,11 @@ def test(
     print(f"Test F1 Score: {f1}")
     print(f"Test Balanced Accuracy: {bal_acc}")
 
-    # return test_loss, f1, bal_acc, np.array(model_probs), np.array(y_true)
+    return test_loss, y_pred, y_true
 
 
 # %%
-model.load_state_dict(torch.load("lstm_unidirectional.pth"))
+model.load_state_dict(torch.load(model_save_path))
 # %%
 model.eval()
 # %%
