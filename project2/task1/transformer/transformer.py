@@ -40,9 +40,19 @@ class PositionalEncoding(nn.Module):
 
 
 def create_padding_mask(seq, pad_token=0.0):
-    # mask that is True for padded elements and False for non-padded elements
-    mask = seq == pad_token
-    return mask
+    # mask that is True if sequence value is equal to pad_token
+    zero_mask = seq == pad_token
+
+    # cumsum of reversed zero mask
+    cumsum = torch.cumsum(zero_mask.flip(dims=[1]), dim=1).flip(dims=[1])
+
+    # count variable indicating the remaining elements in the sequence
+    count_rev = torch.arange(1, seq.size(1) + 1, device=seq.device).flip(dims=[0])
+
+    # padding where remaining zero valies is equal to the number of remaining elements
+    is_pad = cumsum == count_rev
+
+    return is_pad
 
 
 #!!! based on

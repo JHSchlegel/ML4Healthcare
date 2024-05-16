@@ -32,7 +32,7 @@ transformer:
   num_encoder_layers: 5
   dim_feed_forward: 128
   dropout: 0.0
-  transformer_activation: gelu
+  transformer_activation: relu
   use_padding_mask: True
 
 early_stopping:
