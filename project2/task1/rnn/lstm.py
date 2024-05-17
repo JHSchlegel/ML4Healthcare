@@ -31,14 +31,14 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # %%
 input_dim = 1  # x_train.shape[1]
 
-batch_size = 128
+batch_size = 64
 hidden_dim = 128
 layer_dim = 2
 output_dim = 1
 num_epochs = 200
 LR = 3e-4
 
-model_save_path = "../weights/lstm_bidirectional.pth"
+model_save_path = "../weights/lstm_unidirectional.pth"
 
 
 class LSTM(nn.Module):
@@ -160,7 +160,7 @@ def train_and_validate(
 
 # %%
 
-model = LSTM(input_dim, hidden_dim, layer_dim, output_dim, bidirectional=True).to(
+model = LSTM(input_dim, hidden_dim, layer_dim, output_dim, bidirectional=False).to(
     DEVICE
 )
 # model.load_state_dict(torch.load("best_model_new.pth"))
