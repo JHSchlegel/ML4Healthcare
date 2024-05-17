@@ -243,7 +243,7 @@ def train_and_validate(
             )
 
             # update progress bar
-            t.set_description(f"Training Transformer")
+            t.set_description(f"Training CNN")
             t.set_postfix(
                 train_loss=train_loss,
                 val_loss=val_loss,
@@ -269,10 +269,11 @@ def train_and_validate(
                 )
                 summary_writer.add_scalar("F1 score train", train_f1_score, epoch)
                 summary_writer.add_scalar("F1 score val", val_f1_score, epoch)
-
-            if ES.early_stop(model, val_balanced_acc, epoch):
-                break
-    ES.save_best_model(best_model_path)
+            if ES is not None:
+                if ES.early_stop(model, val_balanced_acc, epoch):
+                    break
+    if ES is not None:
+        ES.save_best_model(best_model_path)
     return model
 
 
