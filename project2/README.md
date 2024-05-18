@@ -39,7 +39,7 @@ For part 1 and part 2 one has to access the data via a local path, since we deci
 For both part 1 and part 2, the model weights are stored in the `weights` directory of the respective folders.
 
 ### Code Execution
-When executing the Jupyter Notebooks, make sure to set the current working directory correctly, so that the utils files can be imported.
+When executing the scripts and the Jupyter Notebooks, make sure to set the current working directory correctly, so that the utils files can be imported.
 
 
 ## Source Code Structure
