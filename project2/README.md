@@ -62,7 +62,6 @@ When executing the Jupyter Notebooks, make sure to set the current working direc
     - `lstm_performance_evaluation.ipynb`: Evaluation of the performance of the LSTM
 - `transformer`:
     - `train_transformer.py`: Contains hyperparameters for the classical_ml file
-    - `training.sh`: Linux executable
     - `transformer.ipynb`: Contains performance evaluation and general experiments for the transformer
     - `transformer.py`: Contains the Transformer class and the PositionalEncoding class
     - `transformer_config.yaml`: Contains hyperparameters for the transformer
@@ -105,7 +104,7 @@ task2/
 ├── transfer_learning # Folder for Q1
 ├── visual_learn # Folder for Q3
 └── weights # Folder of weights of all models
-
+```
 
 ## Code References
 In our code files, we have included comments to cite references whenever we have incorporated, adapted, or been inspired by external code snippets.
