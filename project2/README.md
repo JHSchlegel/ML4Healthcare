@@ -47,7 +47,6 @@ When executing the scripts and the Jupyter Notebooks, make sure to set the curre
 
 - `EDA.ipynb`: Notebook for exploratory data analysis of the PTB dataset.
 - `classical_ml`:
-    - `classical_ml_config copy.yaml`: Contains hyperparameters for the classical_ml file
     - `classical_ml_config.yaml`: Contains hyperparameters for the classical_ml file
     - `lightgbm_hyperparameter_tuning.ipynb`: Hyperparameter tuning for lightgbm
     - `lightgbm_performance_eval.ipynb`: Performance evaluation for lightgbm
