@@ -61,12 +61,12 @@ def set_all_seeds(seed: int):
 # !!! https://www.kaggle.com/code/megazotya/ecg-transformer/notebook
 class EarlyStopping:
     def __init__(
-            self,
-            start: int = 50,
-            patience: int = 10,
-            epsilon: float = 1e-6,
-            verbose: bool = False,
-            mode: str = "min",
+        self,
+        start: int = 50,
+        patience: int = 10,
+        epsilon: float = 1e-6,
+        verbose: bool = False,
+        mode: str = "min",
     ):
         self.start = start
         self.counter = 0
@@ -96,7 +96,7 @@ class EarlyStopping:
         """
         # check whether improvement was large enough (if there was any at all)
         if (metric < self.best_score + self.epsilon and self.mode == "min") or (
-                metric > self.best_score - self.epsilon and self.mode == "max"
+            metric > self.best_score - self.epsilon and self.mode == "max"
         ):
             # reset number of epochs without improvement
             self.counter = 0
@@ -128,11 +128,11 @@ class EarlyStopping:
 #                    Model Training and Evaluation                            #
 # =========================================================================== #
 def train_one_epoch(
-        model: nn.Module,
-        optimizer: optim.Optimizer,
-        criterion: nn.Module,
-        train_loader: DataLoader,
-        device: torch.device,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    criterion: nn.Module,
+    train_loader: DataLoader,
+    device: torch.device,
 ) -> tuple[float, float, float, float]:
     """Train the model for one epoch
 
@@ -176,7 +176,7 @@ def train_one_epoch(
 
 
 def validate_one_epoch(
-        model: nn.Module, criterion: nn.Module, val_loader: DataLoader, device: torch.device
+    model: nn.Module, criterion: nn.Module, val_loader: DataLoader, device: torch.device
 ) -> tuple[float, float, float, float]:
     """Validate the model for one epoch
 
@@ -217,19 +217,18 @@ def validate_one_epoch(
 
 
 def train_and_validate(
-        model: nn.Module,
-        optimizer: optim.Optimizer,
-        scheduler: optim.lr_scheduler,
-        criterion: nn.Module,
-        train_loader: DataLoader,
-        val_loader: DataLoader,
-        best_model_path: str = "weights/transformer_pe.pth",
-        device: torch.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu"
-        ),
-        num_epochs: int = 100,
-        ES: EarlyStopping = None,
-
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler,
+    criterion: nn.Module,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    best_model_path: str = "weights/transformer_pe.pth",
+    device: torch.device = torch.device(
+        "cuda:0" if torch.cuda.is_available() else "cpu"
+    ),
+    num_epochs: int = 100,
+    ES: EarlyStopping = None,
 ):
     # make fancy progress bar
     with trange(num_epochs) as t:
@@ -253,20 +252,20 @@ def train_and_validate(
 
             # reduce learning rate
             if scheduler is not None:
-              scheduler.step(val_loss)
+                scheduler.step(val_loss)
             if ES.early_stop(model, val_balanced_acc, epoch):
-              break
+                break
     ES.save_best_model(best_model_path)
-    return modelS
+    return model
 
 
 def test(
-        model: nn.Module,
-        criterion: nn.Module,
-        test_loader: DataLoader,
-        device: torch.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu"
-        ),
+    model: nn.Module,
+    criterion: nn.Module,
+    test_loader: DataLoader,
+    device: torch.device = torch.device(
+        "cuda:0" if torch.cuda.is_available() else "cpu"
+    ),
 ) -> tuple[float, float, float, float]:
     """Test the model
 
@@ -303,8 +302,8 @@ def test(
     test_loss = total_loss / len(test_loader.dataset)
     test_acc = accuracy_score(y_true, y_preds)
     test_balanced_acc = balanced_accuracy_score(y_true, y_preds)
-    #test_f1_score = f1_score(y_true, y_preds, average = None)
-    #print(test_f1_score)
+    # test_f1_score = f1_score(y_true, y_preds, average = None)
+    # print(test_f1_score)
     print(
         f"Test loss: {test_loss:.4f}, Test accuracy: {test_acc:.4f}, Test balanced accuracy: {test_balanced_acc:.4f}S"
     )
