@@ -36,7 +36,7 @@ pip install -r requirements.txt
 For part 1 and part 2 one has to access the data via a local path, since we decided to not upload it into our repository due to memory issues.
 
 ### Model Weights
-For both part 1 and part 2, the model weights are stored in the `weights` directory of the respective folders.
+For both part 1 and part 2, the model weights are stored on `Polybox` and can be downloaded from [here](https://polybox.ethz.ch/index.php/s/p0jJyk307Rp6tgf) using password `ml4hc`. After downloading the weights, create a `weights` directory in the part1 and in the part2 folder and move the respective weights to these folders.
 
 ### Code Execution
 When executing the scripts and the Jupyter Notebooks, make sure to set the current working directory correctly, so that the utils files can be imported.
