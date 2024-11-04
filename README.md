@@ -1,28 +1,41 @@
-# ML4Healthcare
-Private repository for the coding projects of ML for Healthcare at ETHZ
+# Machine Learning For Healthcare
 
-## Table of Contents
-- [Contributors](#contributors)
-- [Project Structure](#project-structure)
+This repository contains two projects developed for the course "Machine Learning For Healthcare." Both projects are designed to apply machine learning techniques to different aspects of healthcare data, aiming to develop predictive models and gain insights into the medical datasets.
 
 ## Contributors
-- Gianni
-- Ciccio
-- Paulo
+- Paul Schlossmacher
+- Gianfranco Basile
+- Jan Schlegel
 
-## Project Structure
+## Projects Overview
+
+### Project 1: Interpretable and Explainable Classification for Medical Data
+Project 1 focuses on the development of interpretable and explainable machine learning models for medical diagnosis using tabular and imaging data. For a detailed explanation of the project structure, dependencies, and instructions on how to run the code, please refer to the README in the `project1` directory.
+
+[Project 1 README](project1/README.md)
+
+### Project 2: Time Series and Representation Learning
+Project 2 explores machine learning models for time-series data in healthcare, emphasizing transfer learning and representation learning to enhance model performance across different datasets. For more information on the architecture, dependencies, and execution instructions, see the README in the `project2` directory.
+
+[Project 2 README](project2/README.md)
+
+## Installation
+To set up a local development environment, follow these steps:
+
+1. Clone the repository:
 ```bash
-├── project1
-│   ├── info
-│   │   ├── Project1.pdf
-│   │   └── Project1 Slides.pdf
-│   ├── README.md
-│   ├── task1
-│   │   └── data
-│   │       └── heart_failure.zip
-│   ├── task2
-│   └── task3
-├── project2
-│   └── README.md
-└── README.md
+   git clone https://github.com/JHSchlegel/ML4Healthcare.git
+````
+2. Navigate to the cloned repository:
+```bash
+cd ML4Healthcare
 ```
+
+3. For each project, install dependencies as described in the project-specific README files.
+
+## Usage
+Refer to individual project READMEs for detailed usage instructions.
+
+
+
+   
